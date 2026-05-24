@@ -1,0 +1,73 @@
+# --- Build artifacts ---
+build/
+build_*/
+**/build/
+**/build_*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/*.vcxproj.filters.in
+**/ALL_BUILD.*
+**/ZERO_CHECK.*
+**/INSTALL.*
+**/x64/
+**/x86/
+**/Debug/
+**/Release/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+*.bak
+*.bak-*
+*.bak.*
+
+# Allow third-party libs that ARE checked in deliberately:
+!proxydivert/**/*.lib
+!proxyhook/**/*.lib
+
+# --- Large local-only data ---
+reference/
+dota2_minify/
+singbox/
+dist/
+
+# --- Encrypted embedded resources (regenerated at build time) ---
+orchestrator/embedded/*.bin
+
+# --- Runtime / logs ---
+*.log
+*.dmp
+botbrain_*.log
+debug_*.log
+*.zip
+DotaFarm.log
+
+# --- Local config / secrets ---
+.env
+*.key
+*.pem
+*.crt
+credentials*
+license.dat
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# --- Visual Studio / IDE ---
+.vs/
+*.vcxproj.user
+*.suo
+.vscode/
+.idea/
+
+# --- OS junk ---
+Thumbs.db
+.DS_Store
+desktop.ini

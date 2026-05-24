@@ -1,0 +1,125 @@
+{
+    "heroes": [
+        "npc_dota_hero_skeleton_king",
+        "npc_dota_hero_sniper",
+        "npc_dota_hero_drow_ranger",
+        "npc_dota_hero_viper",
+        "npc_dota_hero_weaver",
+        "npc_dota_hero_troll_warlord",
+        "npc_dota_hero_juggernaut",
+        "npc_dota_hero_antimage",
+        "npc_dota_hero_phantom_assassin",
+        "npc_dota_hero_gyrocopter",
+        "npc_dota_hero_luna",
+        "npc_dota_hero_terrorblade",
+        "npc_dota_hero_medusa",
+        "npc_dota_hero_slark",
+        "npc_dota_hero_ursa",
+        "npc_dota_hero_sven",
+        "npc_dota_hero_lifestealer",
+        "npc_dota_hero_riki",
+        "npc_dota_hero_bloodseeker",
+        "npc_dota_hero_lina",
+        "npc_dota_hero_lich",
+        "npc_dota_hero_ogre_magi",
+        "npc_dota_hero_jakiro",
+        "npc_dota_hero_witch_doctor",
+        "npc_dota_hero_lion",
+        "npc_dota_hero_shadow_shaman",
+        "npc_dota_hero_warlock",
+        "npc_dota_hero_vengefulspirit",
+        "npc_dota_hero_undying",
+        "npc_dota_hero_zuus"
+    ],
+    "region": 128,
+    "game_mode": 2,
+    "dll_path": "Andromeda-Dota2-Base.dll",
+    "handle_exe": "handle64.exe",
+    "proxyhook_dll": "ProxyHook.dll",
+    "profiles_dir": "C:\\BotProfiles",
+
+    "spoof_mode": "steam_only",
+    "spoofer_exe": "dist\\HwidSpoofer.exe",
+    "spoofer_timeout_ms": 45000,
+
+    "use_tun2socks": false,
+    "use_kernel_redirect": false,
+
+    "launch_mode": "parallel",
+    "launch_cooldown_sec": 600,
+
+    "window_tile": {
+        "layout": "grid_3_2",
+        "force_windowed": false,
+        "auto_on_launch": true,
+        "padding": 4,
+        "monitor_index": -1
+    },
+
+    "pairing": {
+        "enabled": false,
+        "transport": "direct",
+        "role": "master",
+        "user_id": "",
+        "user_auth_token": "",
+        "pair_id": "my-pair-2026",
+        "pair_secret": "change-me-to-32chars-random-string",
+        "master_ip": "127.0.0.1",
+        "ipc_port": 5050,
+        "relay_host": "",
+        "relay_port": 5050,
+        "match_sync_timeout_s": 15,
+        "max_consecutive_cancels": 3,
+        "post_game_winner_grace_s": 60
+    },
+
+    "team_strategy_mode": "auto",
+
+    "minifier": {
+        "enabled": true,
+        "apply_launch_options": false,
+        "apply_autoexec": true,
+        "apply_video_txt": true,
+        "apply_vpk_patches": false,
+        "apply_d3d_hook": false,
+        "fps_max": 15,
+        "resolution_width": 640,
+        "resolution_height": 480,
+
+        "vpk_preset": "minify_aggressive",
+        "wrapper_exe": "scripts\\dota2_minify_wrapper.exe",
+        "python_exe": "python.exe",
+        "wrapper_script": "scripts\\dota2_minify_wrapper.py",
+        "vpk_fix_launch_options": false,
+        "vpk_subprocess_timeout_ms": 60000,
+
+        "render_backend": "dx11",
+
+        "mem_reclaim": {
+            "enabled": true,
+            "interval_s": 60,
+            "auto_threshold_pct": 85,
+            "purge_standby": true,
+            "purge_low_prio_standby": true,
+            "flush_modified": false,
+            "combine_pages": true,
+            "empty_all_working_sets": false
+        }
+    },
+
+    "crash_recovery": {
+        "enabled": true,
+        "heartbeat_suspect_s": 15,
+        "heartbeat_confirm_s": 40,
+        "dump_watch_enabled": true,
+        "max_reconnects_per_match": 3,
+        "max_crashes_per_window": 3,
+        "crash_window_min": 5,
+        "reconnect_cooldown_s": 10,
+        "loading_state_grace_s": 90,
+        "respoof_hwid_on_relaunch": false,
+        "steam_relaunch_enabled": true,
+        "gc_ready_timeout_s": 30,
+        "max_steam_relaunches_per_match": 2
+    }
+}

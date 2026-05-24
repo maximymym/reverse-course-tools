@@ -1,0 +1,6 @@
+=== Dota 2 SchemaSystem Dumper ===
+
+[+] PID: 22988
+[+] SchemaSystem: 0x7ffb5aa97710
+[+] Found client.dll scope at 0x4a01f46a800
+[+] Dumped 0 classes, 0 netvars

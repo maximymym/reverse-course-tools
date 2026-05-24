@@ -1,0 +1,20 @@
+{
+  "alice": {
+    "auth_token": "alice-secret-token-32-chars-aaaaaa",
+    "max_pairs": 5,
+    "max_msg_per_min": 600,
+    "max_bytes_per_min": 1048576,
+    "enabled": true,
+    "created": "2026-05-04T10:00:00Z",
+    "notes": "free tier"
+  },
+  "bob": {
+    "auth_token": "bob-secret-token-32-chars-bbbbbbbb",
+    "max_pairs": 20,
+    "max_msg_per_min": 6000,
+    "max_bytes_per_min": 10485760,
+    "enabled": true,
+    "created": "2026-05-04T11:00:00Z",
+    "notes": "paid"
+  }
+}

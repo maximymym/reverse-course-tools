@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  VMProtect 3.8 project template для DotaFarm bundle.
+
+  Headless вариант (Themida 3.2.4 GUI-only в cracked версии — отказались).
+  Этот template применяется ко ВСЕМ 4 бинарям: protect.sh клонирует его на лету,
+  подставляя реальный <File Name="..."> input path. Output берётся через CLI:
+  VMProtect_Con.exe input.exe output.exe -pf project.vmp
+
+  Без SDK markers (VMProtectBegin/End) ВМ применяется только к точке входа +
+  imports/resources (basic protection). Это меньше чем Themida с Tiger64,
+  но достаточно для anti-link защиты Steam (не stealth-критичный binary).
+
+  ВАЖНО для Steam VAC compatibility:
+    - DetectVirtualMachine = 0 — иначе VPS/cloud юзеры не запустят
+    - DetectDebugger = 1 — стандартная anti-debug, безопасна
+    - PackOutput = 1 — компрессия + import obfuscation, ломает PE-explorer reads
+    - WatermarkName = пустой — без отпечатков
+    - VirtualizationOptions: defaults (no SDK markers → no VM apply, lite mode)
+
+  Для усиления — в orchestrator.cpp / hooks_hwid.cpp / hwid_spoof.cpp
+  добавить #include "VMProtectSDK.h" и обернуть hot regions:
+    VMProtectBeginVirtualization("hwid_spoof_run");
+    ... critical code ...
+    VMProtectEnd();
+  Тогда VMProtect конвертирует эти регионы в VM-bytecode (намного крепче).
+-->
+<Document Version="3" Type="0">
+  <Files>
+    <File Name="__INPUT_FILE_PLACEHOLDER__" Active="1">
+      <Maps>
+        <!-- Empty: без SDK markers нечего virtualize. -->
+      </Maps>
+      <Options>
+        <DebugMode>0</DebugMode>
+        <Watermark></Watermark>
+        <Pack>1</Pack>
+        <DetectDebugger>1</DetectDebugger>
+        <DetectVirtualMachine>0</DetectVirtualMachine>
+        <CheckKernelDebugger>1</CheckKernelDebugger>
+        <ResourceProtection>1</ResourceProtection>
+        <ImportProtection>1</ImportProtection>
+        <MemoryProtection>1</MemoryProtection>
+        <ResourceCompression>1</ResourceCompression>
+        <StripDebugInfo>1</StripDebugInfo>
+        <StripRelocations>0</StripRelocations>
+        <CheckIntegrity>1</CheckIntegrity>
+      </Options>
+    </File>
+  </Files>
+</Document>

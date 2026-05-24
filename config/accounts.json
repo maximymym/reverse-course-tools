@@ -1,0 +1,42 @@
+{
+    "steam_exe": "C:\\Program Files (x86)\\Steam\\steam.exe",
+    "instances": [
+        {
+            "ipc_name": "steam0",
+            "login": "zrvqd87257",
+            "steam_id": 76561198725850781,
+            "persona": "qt317792",
+            "userchooser": false
+        },
+        {
+            "ipc_name": "steam1",
+            "login": "tqbao71896",
+            "steam_id": 76561198729640585,
+            "persona": "tu483458",
+            "userchooser": false
+        },
+        {
+            "ipc_name": "steam2",
+            "login": "orcby73986",
+            "steam_id": 76561198727561349,
+            "persona": "lc669979",
+            "userchooser": false
+        },
+        {
+            "ipc_name": "steam3",
+            "login": "eearx39260",
+            "steam_id": 76561198726132021,
+            "persona": "zy135930",
+            "userchooser": false
+        },
+        {
+            "ipc_name": "steam4",
+            "login": "bupns61922",
+            "steam_id": 76561198728730496,
+            "persona": "da904387",
+            "userchooser": false
+        }
+    ],
+    "dota_app_id": 570,
+    "launch_args": "-novid -nojoy -w 640 -h 480 -windowed +fps_max 15 -console"
+}

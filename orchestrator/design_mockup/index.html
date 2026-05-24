@@ -1,0 +1,1614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1440" />
+<title>DotaFarm — Orchestrator Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=JetBrains+Mono:wght@300;400;500;700&family=Inconsolata:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   DotaFarm Console — design mockup
+   Aesthetic: industrial telemetry / CRT oscilloscope.
+   Tarnished-gold accents on near-black, hard chamfered corners,
+   monospaced everything, ASCII section bars.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  --bg-0:        #0a0907;          /* deepest — page */
+  --bg-1:        #100e0a;          /* panel base */
+  --bg-2:        #18150f;          /* nested */
+  --bg-3:        #211c14;          /* hover / strip */
+  --line:        #2a2418;          /* hairline */
+  --line-hot:    #4a3d22;          /* emphasised hairline */
+  --ink:         #d8c9a8;          /* primary text */
+  --ink-dim:     #8a7e64;          /* secondary text */
+  --ink-mute:    #5a5142;          /* tertiary, axes, scale */
+  --ink-bright:  #f3e6c2;          /* heading text */
+
+  --gold:        #d4a14a;          /* primary accent — DotaFarm gold */
+  --gold-deep:   #8a6622;
+  --gold-glow:   rgba(212,161,74,.30);
+
+  --signal:      #6dd17a;          /* in-game / healthy */
+  --signal-dim:  #2c5a32;
+  --queue:       #5aa4d4;          /* queueing */
+  --queue-dim:   #28465c;
+  --warn:        #e0a85a;          /* loading/warn */
+  --crash:       #d8513b;          /* crash/error */
+  --crash-dim:   #5e2218;
+  --idle:        #6d6453;          /* idle grey */
+
+  --radiant:     #c98a3a;          /* radiant team */
+  --dire:        #527ab0;          /* dire team */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg-0); color: var(--ink); font-family: 'Inconsolata', 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+body {
+  background-image:
+    /* CRT scanlines, very faint */
+    repeating-linear-gradient(0deg, rgba(212,161,74,.014) 0 1px, transparent 1px 3px),
+    /* dotted engineering grid */
+    radial-gradient(circle at 1px 1px, rgba(212,161,74,.06) 1px, transparent 1px);
+  background-size: 100% 3px, 28px 28px;
+  background-attachment: fixed;
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+a { color: var(--gold); text-decoration: none; }
+
+/* ─── Typography helpers ─────────────────────────────────── */
+.mono   { font-family: 'JetBrains Mono', monospace; }
+.dim    { color: var(--ink-dim); }
+.mute   { color: var(--ink-mute); }
+.bright { color: var(--ink-bright); }
+.gold   { color: var(--gold); }
+.uc     { text-transform: uppercase; letter-spacing: .14em; }
+.tab    { font-variant-numeric: tabular-nums; }
+.cinzel { font-family: 'Cinzel', serif; letter-spacing: .04em; }
+
+/* ─── Chamfered panel — the core visual primitive ─────────
+   90° corners with 8px diagonal cuts top-right + bottom-left,
+   single 1px engineered border, no rounding anywhere.
+   ───────────────────────────────────────────────────────── */
+.panel {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  position: relative;
+  /* asymmetric chamfers */
+  clip-path: polygon(
+    0 0,
+    calc(100% - 10px) 0,
+    100% 10px,
+    100% 100%,
+    10px 100%,
+    0 calc(100% - 10px)
+  );
+}
+.panel.hot { border-color: var(--line-hot); }
+
+/* Corner brackets — engineering drawing feel */
+.bracketed { position: relative; }
+.bracketed::before, .bracketed::after,
+.bracketed > .br-tr, .bracketed > .br-bl {
+  content: "";
+  position: absolute;
+  width: 10px; height: 10px;
+  border: 0 solid var(--gold);
+  pointer-events: none;
+}
+.bracketed::before { top: -1px; left: -1px;  border-top-width: 1px; border-left-width: 1px; }
+.bracketed::after  { bottom: -1px; right: -1px; border-bottom-width: 1px; border-right-width: 1px; }
+.bracketed > .br-tr { top: -1px; right: -1px; border-top-width: 1px; border-right-width: 1px; }
+.bracketed > .br-bl { bottom: -1px; left: -1px; border-bottom-width: 1px; border-left-width: 1px; }
+
+/* ─── Chrome ──────────────────────────────────────────── */
+.shell { max-width: 1480px; margin: 0 auto; padding: 18px 22px; }
+
+/* Title bar */
+.titlebar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 22px;
+  align-items: end;
+  padding: 8px 0 14px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.brand { display: flex; align-items: baseline; gap: 14px; }
+.brand .logo {
+  font-family: 'Cinzel', serif;
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: .18em;
+  color: var(--ink-bright);
+  text-shadow: 0 0 24px rgba(212,161,74,.18);
+}
+.brand .logo .em { color: var(--gold); }
+.brand .sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+}
+.brand .ver {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--gold);
+  border: 1px solid var(--line-hot);
+  padding: 2px 8px;
+  letter-spacing: .08em;
+}
+
+.title-meta {
+  display: flex;
+  gap: 18px;
+  justify-content: flex-end;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+.title-meta .pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--line-hot);
+  background: var(--bg-1);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.title-meta .pill .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--signal); box-shadow: 0 0 8px var(--signal);
+}
+.title-meta .pill.update {
+  color: var(--bg-0); background: var(--gold);
+  border-color: var(--gold); cursor: pointer;
+  font-weight: 700;
+}
+.title-meta .pill.update .dot { background: var(--bg-0); box-shadow: none; }
+
+/* tab strip — for switching the 3 mockup states */
+.tabstrip {
+  display: flex; gap: 0;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.tabstrip .tab-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 10px 22px 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  color: var(--ink-mute);
+  cursor: pointer;
+  position: relative; bottom: -1px;
+  margin-right: -1px;
+}
+.tabstrip .tab-btn:hover { color: var(--ink); }
+.tabstrip .tab-btn.is-active {
+  color: var(--gold);
+  background: var(--bg-1);
+  border-color: var(--line-hot);
+  border-bottom: 1px solid var(--bg-1);
+}
+.tabstrip .tab-btn .num {
+  color: var(--ink-mute); margin-right: 8px;
+  font-weight: 300;
+}
+.tabstrip .tab-btn.is-active .num { color: var(--gold-deep); }
+
+.scene { display: none; }
+.scene.is-active { display: block; }
+
+/* ─── Global control bar ─────────────────────────────────── */
+.controlbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.control-actions {
+  display: flex; gap: 0;
+}
+.btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 11px 18px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-hot);
+  color: var(--ink);
+  cursor: pointer;
+  margin-right: -1px;
+  display: inline-flex; align-items: center; gap: 9px;
+  transition: background .12s ease, color .12s ease;
+}
+.btn:hover { background: var(--bg-3); color: var(--ink-bright); }
+.btn .ind { width: 8px; height: 8px; background: var(--ink-mute); display: inline-block; }
+.btn.primary {
+  background: var(--gold);
+  color: var(--bg-0);
+  border-color: var(--gold);
+  font-weight: 700;
+}
+.btn.primary .ind { background: var(--bg-0); }
+.btn.primary:hover { background: #e7b663; color: var(--bg-0); }
+.btn.danger { color: var(--crash); border-color: var(--crash-dim); }
+.btn.danger .ind { background: var(--crash); box-shadow: 0 0 6px var(--crash); }
+.btn.danger:hover { background: var(--crash-dim); color: var(--ink-bright); }
+.btn.recovery {
+  background: var(--crash); color: #fff; border-color: var(--crash);
+  font-weight: 700;
+  animation: rec-pulse 1.6s ease-in-out infinite;
+}
+@keyframes rec-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(216,81,59,.0); }
+  50%     { box-shadow: 0 0 0 6px rgba(216,81,59,.18); }
+}
+
+.control-status {
+  display: flex; gap: 16px; align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--ink-dim);
+}
+.kv { display: inline-flex; align-items: center; gap: 6px; }
+.kv .k { color: var(--ink-mute); }
+.kv .v { color: var(--ink-bright); }
+.kv .v.acc { color: var(--gold); }
+
+/* SVG inline icons */
+.ico { width: 12px; height: 12px; display: inline-block; vertical-align: middle; fill: currentColor; }
+.ico-lg { width: 14px; height: 14px; }
+
+/* ─── Master grid: telemetry rail (left) + cards matrix ── */
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.rail { display: grid; gap: 14px; align-content: start; }
+
+/* Telemetry blocks in the left rail */
+.tile { padding: 14px 14px 12px; }
+.tile h4 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .22em;
+  color: var(--ink-mute);
+  margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.tile h4::after {
+  content: "";
+  flex: 1; height: 1px;
+  background: var(--line);
+  margin-left: 10px;
+}
+
+.bigstat {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 4px;
+}
+.bigstat .num {
+  font-family: 'Cinzel', serif;
+  font-size: 38px;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.bigstat .unit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-mute);
+  text-transform: uppercase; letter-spacing: .12em;
+}
+
+.minigrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+.minigrid .row {
+  display: flex; justify-content: space-between;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  border-bottom: 1px dotted var(--line);
+  padding: 4px 0;
+}
+.minigrid .row .k { color: var(--ink-mute); text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }
+.minigrid .row .v { color: var(--ink-bright); }
+
+/* Sparkline-like activity bars */
+.spark { display: flex; align-items: flex-end; height: 38px; gap: 2px; margin-top: 8px; }
+.spark span {
+  flex: 1;
+  background: var(--gold-deep);
+  min-height: 3px;
+  position: relative;
+}
+.spark span.hot { background: var(--gold); box-shadow: 0 0 6px var(--gold-glow); }
+.spark span.dim { background: var(--line-hot); }
+
+/* ─── Cards matrix ─────────────────────────────────────── */
+.matrix {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.card {
+  background: var(--bg-1);
+  position: relative;
+  display: flex; flex-direction: column;
+  min-height: 410px;
+  border: 1px solid var(--line);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 12px) 0,
+    100% 12px,
+    100% 100%,
+    12px 100%,
+    0 calc(100% - 12px)
+  );
+}
+.card.idle    { border-color: var(--line); }
+.card.loading { border-color: var(--warn); box-shadow: inset 0 0 0 0 rgba(224,168,90,.0); }
+.card.queue   { border-color: var(--queue-dim); }
+.card.playing { border-color: var(--signal-dim); }
+.card.crashed { border-color: var(--crash-dim); }
+
+/* status-coloured top stripe — runs the full width like an LED */
+.card .stripe {
+  height: 3px;
+  background: var(--idle);
+  position: relative;
+}
+.card.idle    .stripe { background: var(--idle); }
+.card.loading .stripe { background: var(--warn); animation: stripe-stream 2s linear infinite;
+  background-image: repeating-linear-gradient(90deg, var(--warn) 0 14px, rgba(224,168,90,.25) 14px 28px);
+  background-size: 28px 100%;
+}
+.card.queue   .stripe { background: var(--queue); }
+.card.playing .stripe { background: var(--signal); box-shadow: 0 0 10px var(--signal); }
+.card.crashed .stripe { background: var(--crash); }
+
+@keyframes stripe-stream { from { background-position: 0 0; } to { background-position: -28px 0; } }
+
+.card .head {
+  padding: 10px 12px 8px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px dotted var(--line);
+}
+.card .ix {
+  font-family: 'Cinzel', serif;
+  font-weight: 900;
+  font-size: 24px;
+  color: var(--gold);
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-hot);
+  background: var(--bg-2);
+  line-height: 1;
+}
+.card .login {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-bright);
+  letter-spacing: .04em;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.card .login .alias { color: var(--ink-mute); display: block; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; margin-top: 2px; }
+
+.led {
+  width: 10px; height: 10px;
+  border: 1px solid var(--line-hot);
+  background: var(--idle);
+  position: relative;
+}
+.led.on  { background: var(--signal); border-color: var(--signal-dim); animation: led-pulse 1.2s ease-in-out infinite; }
+.led.warn { background: var(--warn);  border-color: #5a431f; animation: led-pulse 1.0s ease-in-out infinite; }
+.led.queue { background: var(--queue); border-color: var(--queue-dim); animation: led-pulse 1.4s ease-in-out infinite; }
+.led.crash { background: var(--crash); border-color: var(--crash-dim); animation: led-blink 0.6s steps(1) infinite; }
+@keyframes led-pulse { 0%,100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; } 50% { box-shadow: 0 0 0 4px transparent; opacity: .55; } }
+@keyframes led-blink { 0%,49% { opacity: 1; } 50%,100% { opacity: .25; } }
+
+.card .state-line {
+  padding: 6px 12px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  display: flex; justify-content: space-between;
+}
+.card .state-line .now { color: var(--ink-bright); }
+.card.playing .state-line .now { color: var(--signal); }
+.card.queue   .state-line .now { color: var(--queue); }
+.card.loading .state-line .now { color: var(--warn); }
+.card.crashed .state-line .now { color: var(--crash); }
+
+/* hero plate + portrait */
+.heroplate {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.portrait {
+  width: 56px; height: 56px;
+  background: var(--bg-0);
+  border: 1px solid var(--line-hot);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+.portrait.empty {
+  color: var(--ink-mute);
+  font-family: 'Cinzel', serif; font-size: 22px; font-weight: 700;
+}
+.portrait svg { width: 100%; height: 100%; display: block; }
+
+.hero-meta { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.hero-meta .name {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink-bright);
+  letter-spacing: .04em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hero-meta .role {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-mute);
+  text-transform: uppercase; letter-spacing: .14em;
+  margin-top: 2px;
+}
+.hero-meta .role .leader { color: var(--gold); }
+.hero-meta .role .member { color: var(--queue); }
+
+/* HP bar */
+.hpbar {
+  margin-top: 6px;
+  height: 8px;
+  background: var(--bg-0);
+  border: 1px solid var(--line-hot);
+  position: relative;
+}
+.hpbar .fill {
+  height: 100%;
+  background: var(--signal);
+  background-image: repeating-linear-gradient(90deg, transparent 0 6px, rgba(0,0,0,.18) 6px 8px);
+  box-shadow: inset 0 0 6px rgba(109,209,122,.35);
+}
+.hpbar .fill.dim { background: var(--warn); }
+.hpbar .label {
+  position: absolute; inset: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--bg-0);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  letter-spacing: .08em;
+  mix-blend-mode: screen;
+}
+
+/* progress bar — used for "loading dota" */
+.progress {
+  margin-top: 6px;
+  height: 8px;
+  background: var(--bg-0);
+  border: 1px solid var(--line-hot);
+  position: relative;
+  overflow: hidden;
+}
+.progress .fill {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--warn), transparent);
+  width: 35%;
+  animation: progress-stream 1.6s linear infinite;
+}
+@keyframes progress-stream { from { left: -35%; } to { left: 100%; } }
+
+.progress.queue .fill { background: linear-gradient(90deg, transparent, var(--queue), transparent); animation-duration: 2.2s; }
+
+/* meta data table inside card */
+.card .table {
+  padding: 10px 12px 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 14px;
+  row-gap: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.card .table .row {
+  display: flex; justify-content: space-between;
+  border-bottom: 1px dotted var(--line);
+  padding: 5px 0;
+}
+.card .table .row .k {
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 9px;
+}
+.card .table .row .v {
+  color: var(--ink-bright);
+  font-variant-numeric: tabular-nums;
+}
+.card .table .row .v.warn { color: var(--warn); }
+.card .table .row .v.signal { color: var(--signal); }
+.card .table .row .v.queue { color: var(--queue); }
+.card .table .row .v.crash { color: var(--crash); }
+.card .table .row .v.dim { color: var(--ink-mute); }
+
+.card .actions {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  border-top: 1px solid var(--line);
+}
+.card .actions .a {
+  background: var(--bg-1);
+  color: var(--ink-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 9px 0;
+  text-align: center;
+  cursor: pointer;
+  border-right: 1px solid var(--line);
+  transition: background .12s ease, color .12s ease;
+}
+.card .actions .a:last-child { border-right: none; }
+.card .actions .a:hover { color: var(--gold); background: var(--bg-3); }
+.card .actions .a.go { color: var(--signal); }
+.card .actions .a.stop { color: var(--crash); }
+.card .actions .a.disabled { color: var(--ink-mute); cursor: not-allowed; }
+.card .actions .a.disabled:hover { color: var(--ink-mute); background: var(--bg-1); }
+
+/* Crash detail box */
+.crash-detail {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  background: rgba(216,81,59,.06);
+  border-left: 2px solid var(--crash);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-dim);
+  word-break: break-all;
+}
+.crash-detail .lbl { color: var(--crash); text-transform: uppercase; letter-spacing: .14em; font-size: 9px; display: block; margin-bottom: 3px; }
+.crash-detail .path { color: var(--ink); }
+
+/* ─── Bottom log panel ─────────────────────────────────── */
+.log-panel {
+  margin-top: 16px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-hot);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 14px,
+    100% 100%,
+    14px 100%,
+    0 calc(100% - 14px)
+  );
+}
+.log-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line-hot);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase; letter-spacing: .14em;
+  color: var(--ink-mute);
+}
+.log-head .filters { display: flex; gap: 4px; }
+.log-head .filters .chip {
+  padding: 3px 9px;
+  border: 1px solid var(--line-hot);
+  font-size: 10px;
+  letter-spacing: .1em;
+  cursor: pointer;
+  color: var(--ink-dim);
+}
+.log-head .filters .chip.is-on { color: var(--gold); border-color: var(--gold-deep); background: rgba(212,161,74,.08); }
+
+.log-body {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 22px, rgba(212,161,74,.025) 22px 23px),
+    var(--bg-0);
+  padding: 12px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  max-height: 240px;
+  overflow: hidden;
+}
+.log-body .line { padding: 1px 0; display: grid; grid-template-columns: 92px 64px 1fr; gap: 10px; }
+.log-body .line .ts { color: var(--ink-mute); }
+.log-body .line .src { color: var(--gold-deep); text-transform: uppercase; letter-spacing: .08em; }
+.log-body .line .src.brain { color: var(--gold); }
+.log-body .line .src.gc    { color: var(--queue); }
+.log-body .line .src.lua   { color: #8a7e64; }
+.log-body .line .src.warn  { color: var(--warn); }
+.log-body .line .src.crash { color: var(--crash); }
+.log-body .line .msg { color: var(--ink); }
+.log-body .line .msg .hi { color: var(--ink-bright); }
+.log-body .line .msg .hex { color: var(--gold); }
+
+/* ─── Footer ─────────────────────────────────────────── */
+.footer {
+  margin-top: 22px;
+  display: flex; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-mute);
+  text-transform: uppercase; letter-spacing: .14em;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.footer .ascii { letter-spacing: 0; color: var(--gold-deep); }
+
+/* dotted ascii separator */
+.sep-ascii {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--gold-deep);
+  font-size: 11px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  margin: 0 0 12px;
+}
+
+/* small-screen guard (this is a desktop tool mockup) */
+@media (max-width: 1280px) {
+  .matrix { grid-template-columns: repeat(3, 1fr); }
+  .layout { grid-template-columns: 240px 1fr; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- Inline SVG sprite for hero portraits — stylised silhouettes, not real Dota art -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Skeleton King: crowned skull -->
+    <symbol id="hero-sk" viewBox="0 0 56 56">
+      <rect width="56" height="56" fill="#1a1308"/>
+      <path d="M14 6 L18 12 L22 6 L26 12 L30 6 L34 12 L38 6 L42 14 L42 18 L14 18 Z" fill="#d4a14a"/>
+      <ellipse cx="28" cy="32" rx="14" ry="16" fill="#e6d4a8"/>
+      <ellipse cx="22" cy="30" rx="3" ry="4" fill="#0a0907"/>
+      <ellipse cx="34" cy="30" rx="3" ry="4" fill="#0a0907"/>
+      <path d="M22 40 L26 38 L28 42 L30 38 L34 40 L34 44 L22 44 Z" fill="#0a0907"/>
+      <circle cx="20" cy="10" r="2" fill="#d8513b"/>
+      <circle cx="36" cy="10" r="2" fill="#d8513b"/>
+      <circle cx="28" cy="8" r="2.5" fill="#6dd17a"/>
+    </symbol>
+    <!-- Sniper: scoped helmet -->
+    <symbol id="hero-sn" viewBox="0 0 56 56">
+      <rect width="56" height="56" fill="#1a1308"/>
+      <ellipse cx="28" cy="34" rx="16" ry="14" fill="#3a2e1a"/>
+      <rect x="12" y="22" width="32" height="10" fill="#8a6622"/>
+      <circle cx="36" cy="28" r="6" fill="#0a0907" stroke="#d4a14a" stroke-width="1.5"/>
+      <circle cx="36" cy="28" r="2" fill="#d8513b"/>
+      <line x1="42" y1="28" x2="52" y2="28" stroke="#d4a14a" stroke-width="2"/>
+      <path d="M16 38 L24 42 L18 46 Z" fill="#d4a14a"/>
+    </symbol>
+    <!-- Drow Ranger: hooded archer -->
+    <symbol id="hero-dr" viewBox="0 0 56 56">
+      <rect width="56" height="56" fill="#0e1620"/>
+      <path d="M14 24 Q14 8 28 8 Q42 8 42 24 L42 38 L14 38 Z" fill="#1a3050"/>
+      <path d="M22 26 L26 22 L26 30 Z" fill="#5aa4d4"/>
+      <path d="M34 26 L30 22 L30 30 Z" fill="#5aa4d4"/>
+      <line x1="46" y1="6" x2="46" y2="50" stroke="#8a6622" stroke-width="1"/>
+      <line x1="42" y1="10" x2="50" y2="10" stroke="#8a6622" stroke-width="1"/>
+      <line x1="42" y1="46" x2="50" y2="46" stroke="#8a6622" stroke-width="1"/>
+    </symbol>
+    <!-- Lina: fire mage -->
+    <symbol id="hero-li" viewBox="0 0 56 56">
+      <rect width="56" height="56" fill="#22120a"/>
+      <path d="M28 6 Q14 14 14 30 Q14 44 28 50 Q42 44 42 30 Q42 14 28 6 Z" fill="#d4a14a"/>
+      <path d="M28 12 Q20 18 20 30 Q20 38 28 44 Q36 38 36 30 Q36 18 28 12 Z" fill="#d8513b"/>
+      <ellipse cx="28" cy="28" rx="3" ry="6" fill="#fff" opacity=".75"/>
+      <circle cx="22" cy="22" r="1.5" fill="#fff"/>
+      <circle cx="34" cy="22" r="1.5" fill="#fff"/>
+    </symbol>
+    <!-- Witch Doctor: tribal mask -->
+    <symbol id="hero-wd" viewBox="0 0 56 56">
+      <rect width="56" height="56" fill="#0e1a10"/>
+      <ellipse cx="28" cy="30" rx="16" ry="20" fill="#3a5a32"/>
+      <path d="M16 24 L40 24 L36 18 L20 18 Z" fill="#6dd17a"/>
+      <ellipse cx="22" cy="32" rx="2.5" ry="3" fill="#0a0907"/>
+      <ellipse cx="34" cy="32" rx="2.5" ry="3" fill="#0a0907"/>
+      <path d="M20 42 L24 40 L28 44 L32 40 L36 42 L34 46 L22 46 Z" fill="#d4a14a"/>
+      <path d="M14 14 L18 18 M42 14 L38 18" stroke="#d4a14a" stroke-width="2"/>
+    </symbol>
+    <!-- generic placeholder -->
+    <symbol id="hero-x" viewBox="0 0 56 56">
+      <rect width="56" height="56" fill="#15110a"/>
+      <path d="M10 10 L46 46 M46 10 L10 46" stroke="#3a3020" stroke-width="2"/>
+      <text x="28" y="34" text-anchor="middle" font-family="Cinzel" font-size="16" font-weight="900" fill="#5a5142">?</text>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="shell">
+
+  <!-- ═════════════════════════ TITLE BAR ═════════════════════════ -->
+  <header class="titlebar">
+    <div class="brand">
+      <div class="logo">DOTA<span class="em">FARM</span></div>
+      <div>
+        <div class="ver">v2026.04.29.1117</div>
+        <div class="sub" style="margin-top:6px">Multi-Account Orchestrator · Build #4138</div>
+      </div>
+    </div>
+    <div></div>
+    <div class="title-meta">
+      <span class="pill"><span class="dot"></span>Andromeda CDN · 17ms</span>
+      <span class="pill" style="color:var(--gold)">Licensed · 28d remain</span>
+      <span class="pill update"><span class="dot"></span>Update v2026.04.30.0901 →</span>
+    </div>
+  </header>
+
+  <!-- Three-state tab strip -->
+  <nav class="tabstrip">
+    <button class="tab-btn" data-scene="idle"><span class="num">01.</span>Cold Start</button>
+    <button class="tab-btn is-active" data-scene="active"><span class="num">02.</span>Active Farm</button>
+    <button class="tab-btn" data-scene="crash"><span class="num">03.</span>Crash Recovery</button>
+  </nav>
+
+  <!-- ═════════════════════════ SCENE 1: IDLE ═════════════════════════ -->
+  <section class="scene" data-scene="idle">
+
+    <div class="controlbar">
+      <div class="control-actions">
+        <button class="btn primary"><span class="ind"></span>Start All · 5</button>
+        <button class="btn"><span class="ind"></span>Stop All</button>
+        <button class="btn">Pause Queue</button>
+        <button class="btn">Settings</button>
+        <button class="btn">Logs</button>
+      </div>
+      <div class="control-status">
+        <span class="kv"><span class="k">HWID·SPOOFER</span><span class="v acc">ARMED</span></span>
+        <span class="kv"><span class="k">EXIT·IP</span><span class="v">185.​244.​173.​210 / NL-AMS</span></span>
+        <span class="kv"><span class="k">SING-BOX</span><span class="v">5/5 RDY</span></span>
+        <span class="kv"><span class="k">UPTIME</span><span class="v">00:00:00</span></span>
+      </div>
+    </div>
+
+    <div class="layout">
+
+      <!-- Left telemetry rail -->
+      <aside class="rail">
+        <div class="panel bracketed tile">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4>Session</h4>
+          <div class="bigstat"><span class="num">00</span><span class="unit">Active</span></div>
+          <div class="dim mono" style="font-size:11px;margin-bottom:10px">Awaiting operator command.</div>
+          <div class="minigrid">
+            <div class="row"><span class="k">Heroes</span><span class="v">30</span></div>
+            <div class="row"><span class="k">Region</span><span class="v">EU·W</span></div>
+            <div class="row"><span class="k">Mode</span><span class="v">PARALLEL</span></div>
+            <div class="row"><span class="k">Cooldown</span><span class="v">600s</span></div>
+          </div>
+        </div>
+
+        <div class="panel bracketed tile">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4>Pre-flight</h4>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.85">
+            <div><span class="signal-checkmark gold">▮</span> <span class="dim">accounts.json</span> <span class="bright">5/5</span></div>
+            <div><span class="gold">▮</span> <span class="dim">Andromeda DLL</span> <span class="bright">v6774</span></div>
+            <div><span class="gold">▮</span> <span class="dim">ProxyHook DLL</span> <span class="bright">loaded</span></div>
+            <div><span class="gold">▮</span> <span class="dim">HwidSpoofer</span> <span class="bright">primed</span></div>
+            <div><span class="gold">▮</span> <span class="dim">sing-box tun</span> <span class="bright">utun3</span></div>
+            <div><span style="color:var(--ink-mute)">▯</span> <span class="dim">Steam clients</span> <span class="mute">offline</span></div>
+            <div><span style="color:var(--ink-mute)">▯</span> <span class="dim">GSI listeners</span> <span class="mute">0/5</span></div>
+          </div>
+        </div>
+
+        <div class="panel bracketed tile">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4>Last Session</h4>
+          <div class="minigrid">
+            <div class="row"><span class="k">Games</span><span class="v">42</span></div>
+            <div class="row"><span class="k">XP·Avg</span><span class="v">+1.2k</span></div>
+            <div class="row"><span class="k">Crashes</span><span class="v">1</span></div>
+            <div class="row"><span class="k">Runtime</span><span class="v">7h 12m</span></div>
+          </div>
+          <div class="spark">
+            <span style="height:18%"></span><span style="height:34%"></span>
+            <span style="height:42%"></span><span style="height:30%"></span>
+            <span style="height:55%" class="dim"></span><span style="height:48%"></span>
+            <span style="height:62%"></span><span style="height:71%"></span>
+            <span style="height:54%"></span><span style="height:80%" class="hot"></span>
+            <span style="height:68%"></span><span style="height:74%"></span>
+            <span style="height:55%"></span><span style="height:38%" class="dim"></span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Card matrix — all idle -->
+      <main>
+        <div class="sep-ascii">┌── ACCOUNTS · 5/5 CONFIGURED ────────────────────────────────────────────────────────────────────────────────────────────┐</div>
+        <div class="matrix">
+          <!-- Card 0..4 idle -->
+          <article class="card idle">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">0</div>
+              <div class="login">zrvqd***781<span class="alias">qt317792 · steam0</span></div>
+              <span class="led"></span>
+            </header>
+            <div class="state-line"><span>STATE</span><span class="now">IDLE</span></div>
+            <div class="heroplate">
+              <div class="portrait empty">—</div>
+              <div class="hero-meta">
+                <div class="name dim">— no hero —</div>
+                <div class="role">awaiting launch</div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">SM</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">GC</span><span class="v dim">offline</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">Party</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">HB</span><span class="v dim">—</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a go">▶ Start</span>
+              <span class="a disabled">⏹ Stop</span>
+              <span class="a disabled">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <article class="card idle">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">1</div>
+              <div class="login">tqbao***585<span class="alias">tu483458 · steam1</span></div>
+              <span class="led"></span>
+            </header>
+            <div class="state-line"><span>STATE</span><span class="now">IDLE</span></div>
+            <div class="heroplate">
+              <div class="portrait empty">—</div>
+              <div class="hero-meta">
+                <div class="name dim">— no hero —</div>
+                <div class="role">awaiting launch</div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">SM</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">GC</span><span class="v dim">offline</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">Party</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">HB</span><span class="v dim">—</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a go">▶ Start</span>
+              <span class="a disabled">⏹ Stop</span>
+              <span class="a disabled">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <article class="card idle">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">2</div>
+              <div class="login">orcby***349<span class="alias">lc669979 · steam2</span></div>
+              <span class="led"></span>
+            </header>
+            <div class="state-line"><span>STATE</span><span class="now">IDLE</span></div>
+            <div class="heroplate">
+              <div class="portrait empty">—</div>
+              <div class="hero-meta">
+                <div class="name dim">— no hero —</div>
+                <div class="role">awaiting launch</div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">SM</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">GC</span><span class="v dim">offline</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">Party</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">HB</span><span class="v dim">—</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a go">▶ Start</span>
+              <span class="a disabled">⏹ Stop</span>
+              <span class="a disabled">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <article class="card idle">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">3</div>
+              <div class="login">eearx***021<span class="alias">zy135930 · steam3</span></div>
+              <span class="led"></span>
+            </header>
+            <div class="state-line"><span>STATE</span><span class="now">IDLE</span></div>
+            <div class="heroplate">
+              <div class="portrait empty">—</div>
+              <div class="hero-meta">
+                <div class="name dim">— no hero —</div>
+                <div class="role">awaiting launch</div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">SM</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">GC</span><span class="v dim">offline</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">Party</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">HB</span><span class="v dim">—</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a go">▶ Start</span>
+              <span class="a disabled">⏹ Stop</span>
+              <span class="a disabled">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <article class="card idle">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">4</div>
+              <div class="login">bupns***496<span class="alias">da904387 · steam4</span></div>
+              <span class="led"></span>
+            </header>
+            <div class="state-line"><span>STATE</span><span class="now">IDLE</span></div>
+            <div class="heroplate">
+              <div class="portrait empty">—</div>
+              <div class="hero-meta">
+                <div class="name dim">— no hero —</div>
+                <div class="role">awaiting launch</div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">SM</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">GC</span><span class="v dim">offline</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">Party</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">HB</span><span class="v dim">—</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a go">▶ Start</span>
+              <span class="a disabled">⏹ Stop</span>
+              <span class="a disabled">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+        </div>
+
+        <!-- Idle log -->
+        <div class="log-panel">
+          <div class="log-head">
+            <span>// orchestrator.log · live tail</span>
+            <div class="filters">
+              <span class="chip is-on">ALL</span><span class="chip">BRAIN</span><span class="chip">GC</span><span class="chip">LUA</span><span class="chip">WARN</span>
+            </div>
+          </div>
+          <div class="log-body">
+            <div class="line"><span class="ts">11:16:48.012</span><span class="src">cfg</span><span class="msg">accounts.json loaded · <span class="hi">5</span> instances · region <span class="hi">EU-W</span></span></div>
+            <div class="line"><span class="ts">11:16:48.018</span><span class="src">cfg</span><span class="msg">farm.json: heroes=<span class="hi">30</span> mode=<span class="hi">parallel</span> cooldown=<span class="hi">600s</span></span></div>
+            <div class="line"><span class="ts">11:16:48.094</span><span class="src">hwid</span><span class="msg">spoofer armed · seed <span class="hex">0x7c4af6a1::e88d1a07</span> · 4 vectors locked</span></div>
+            <div class="line"><span class="ts">11:16:48.211</span><span class="src">net</span><span class="msg">sing-box up: 5 tunnels via <span class="hi">utun3</span> · exit <span class="hi">185.244.173.210</span> [NL-AMS]</span></div>
+            <div class="line"><span class="ts">11:16:48.244</span><span class="src">gsi</span><span class="msg">HTTP listener bound :<span class="hi">3001</span> · cfg installed → 5 dota dirs</span></div>
+            <div class="line"><span class="ts">11:16:48.260</span><span class="src">orch</span><span class="msg">all preconditions OK · awaiting <span class="hi">[Start All]</span></span></div>
+            <div class="line"><span class="ts">11:16:49.001</span><span class="src">orch</span><span class="msg">heartbeat ✓ · idle for 00:00:01.000</span></div>
+            <div class="line"><span class="ts">11:16:50.001</span><span class="src">orch</span><span class="msg">heartbeat ✓ · idle for 00:00:02.000</span></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </section>
+
+  <!-- ═════════════════════════ SCENE 2: ACTIVE ═════════════════════════ -->
+  <section class="scene is-active" data-scene="active">
+
+    <div class="controlbar">
+      <div class="control-actions">
+        <button class="btn"><span class="ind" style="background:var(--signal);box-shadow:0 0 6px var(--signal)"></span>Running · 5/5</button>
+        <button class="btn danger"><span class="ind"></span>Stop All</button>
+        <button class="btn">Pause Queue</button>
+        <button class="btn">Settings</button>
+        <button class="btn">Logs</button>
+      </div>
+      <div class="control-status">
+        <span class="kv"><span class="k">HWID·SPOOFER</span><span class="v acc">ARMED</span></span>
+        <span class="kv"><span class="k">EXIT·IP</span><span class="v">185.244.173.210 / NL-AMS</span></span>
+        <span class="kv"><span class="k">SING-BOX</span><span class="v">5/5</span></span>
+        <span class="kv"><span class="k">UPTIME</span><span class="v">02:47:13</span></span>
+      </div>
+    </div>
+
+    <div class="layout">
+
+      <aside class="rail">
+        <div class="panel bracketed tile">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4>Session</h4>
+          <div class="bigstat"><span class="num">17</span><span class="unit">games / 5h</span></div>
+          <div class="minigrid">
+            <div class="row"><span class="k">Live</span><span class="v" style="color:var(--signal)">3</span></div>
+            <div class="row"><span class="k">Queue</span><span class="v" style="color:var(--queue)">1</span></div>
+            <div class="row"><span class="k">Loading</span><span class="v" style="color:var(--warn)">1</span></div>
+            <div class="row"><span class="k">Crashed</span><span class="v">0</span></div>
+            <div class="row"><span class="k">Win·Rate</span><span class="v">52%</span></div>
+            <div class="row"><span class="k">XP·Hr</span><span class="v">+8.4k</span></div>
+          </div>
+        </div>
+
+        <div class="panel bracketed tile">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4>Throughput · 60s</h4>
+          <div class="spark">
+            <span style="height:48%"></span><span style="height:62%"></span>
+            <span style="height:38%" class="dim"></span><span style="height:52%"></span>
+            <span style="height:71%"></span><span style="height:84%" class="hot"></span>
+            <span style="height:62%"></span><span style="height:55%"></span>
+            <span style="height:74%"></span><span style="height:48%"></span>
+            <span style="height:88%" class="hot"></span><span style="height:64%"></span>
+            <span style="height:42%"></span><span style="height:58%"></span>
+            <span style="height:78%"></span><span style="height:52%"></span>
+            <span style="height:66%"></span><span style="height:45%" class="dim"></span>
+          </div>
+          <div class="minigrid" style="margin-top:10px">
+            <div class="row"><span class="k">GC·msg/s</span><span class="v">142</span></div>
+            <div class="row"><span class="k">GSI·tick</span><span class="v">29.97</span></div>
+          </div>
+        </div>
+
+        <div class="panel bracketed tile">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4>Network · per-bot</h4>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.9">
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px"><span class="dim">#0</span><span class="bright">socks5/utun3</span><span class="gold">38ms</span></div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px"><span class="dim">#1</span><span class="bright">socks5/utun3</span><span class="gold">42ms</span></div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px"><span class="dim">#2</span><span class="bright">socks5/utun3</span><span class="gold">29ms</span></div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px"><span class="dim">#3</span><span class="bright">socks5/utun3</span><span class="gold">51ms</span></div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px"><span class="dim">#4</span><span class="bright">socks5/utun3</span><span class="gold">35ms</span></div>
+          </div>
+        </div>
+
+        <div class="panel bracketed tile">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4>Party Topology</h4>
+          <div class="mono" style="font-size:11px;color:var(--ink-dim);line-height:1.7">
+            <div style="color:var(--gold)">▮ Group A · #0 leader</div>
+            <div style="padding-left:12px;color:var(--ink-bright)">└ #0, #1 → match 73841<wbr>02</div>
+            <div style="margin-top:8px;color:var(--gold)">▮ Group B · #2 leader</div>
+            <div style="padding-left:12px;color:var(--ink-bright)">└ #2, #3 → queueing</div>
+            <div style="margin-top:8px;color:var(--gold)">▮ Solo · #4</div>
+            <div style="padding-left:12px;color:var(--ink-bright)">└ loading dota</div>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <div class="sep-ascii">┌── ACCOUNTS · 3 LIVE · 1 QUEUE · 1 LOADING ─────────────────────────────────────────────────────────────────────────────┐</div>
+        <div class="matrix">
+
+          <!-- ── #0 PLAYING — Skeleton King leader ── -->
+          <article class="card playing">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">0</div>
+              <div class="login">zrvqd***781<span class="alias">qt317792 · steam0</span></div>
+              <span class="led on" style="color:var(--signal)"></span>
+            </header>
+            <div class="state-line"><span>SM·STATE</span><span class="now">GAME_IN_PROGRESS</span></div>
+            <div class="heroplate">
+              <div class="portrait"><svg><use href="#hero-sk"/></svg></div>
+              <div class="hero-meta">
+                <div class="name">Skeleton King</div>
+                <div class="role"><span class="leader">◆ LEADER</span> · party 2980<wbr>9934</div>
+                <div class="hpbar"><div class="fill" style="width:100%"></div><div class="label">868 / 868</div></div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v">30532</span></div>
+              <div class="row"><span class="k">Time</span><span class="v signal">55:38</span></div>
+              <div class="row"><span class="k">GC·msg</span><span class="v">3,241</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v">38ms</span></div>
+              <div class="row"><span class="k">Lobby</span><span class="v">7384102</span></div>
+              <div class="row"><span class="k">HB</span><span class="v signal">12ms</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a disabled">▶ Start</span>
+              <span class="a stop">⏹ Stop</span>
+              <span class="a">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <!-- ── #1 PLAYING — Witch Doctor member ── -->
+          <article class="card playing">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">1</div>
+              <div class="login">tqbao***585<span class="alias">tu483458 · steam1</span></div>
+              <span class="led on" style="color:var(--signal)"></span>
+            </header>
+            <div class="state-line"><span>SM·STATE</span><span class="now">GAME_IN_PROGRESS</span></div>
+            <div class="heroplate">
+              <div class="portrait"><svg><use href="#hero-wd"/></svg></div>
+              <div class="hero-meta">
+                <div class="name">Witch Doctor</div>
+                <div class="role"><span class="member">◇ MEMBER</span> · party 2980<wbr>9934</div>
+                <div class="hpbar"><div class="fill" style="width:62%"></div><div class="label">373 / 604</div></div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v">35336</span></div>
+              <div class="row"><span class="k">Time</span><span class="v signal">55:38</span></div>
+              <div class="row"><span class="k">GC·msg</span><span class="v">3,239</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v">42ms</span></div>
+              <div class="row"><span class="k">Lobby</span><span class="v">7384102</span></div>
+              <div class="row"><span class="k">HB</span><span class="v signal">8ms</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a disabled">▶ Start</span>
+              <span class="a stop">⏹ Stop</span>
+              <span class="a">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <!-- ── #2 QUEUEING — Drow leader ── -->
+          <article class="card queue">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">2</div>
+              <div class="login">orcby***349<span class="alias">lc669979 · steam2</span></div>
+              <span class="led queue" style="color:var(--queue)"></span>
+            </header>
+            <div class="state-line"><span>SM·STATE</span><span class="now">FINDING_MATCH</span></div>
+            <div class="heroplate">
+              <div class="portrait"><svg><use href="#hero-dr"/></svg></div>
+              <div class="hero-meta">
+                <div class="name">Drow Ranger</div>
+                <div class="role"><span class="leader">◆ LEADER</span> · party 2980<wbr>9988</div>
+                <div class="progress queue"><div class="fill"></div></div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v">37824</span></div>
+              <div class="row"><span class="k">Q·Time</span><span class="v queue">02:14</span></div>
+              <div class="row"><span class="k">GC·msg</span><span class="v">812</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v">29ms</span></div>
+              <div class="row"><span class="k">Region</span><span class="v">EU-W</span></div>
+              <div class="row"><span class="k">HB</span><span class="v signal">14ms</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a disabled">▶ Start</span>
+              <span class="a stop">⏹ Stop</span>
+              <span class="a">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <!-- ── #3 PLAYING — Lina member of group B BUT she's already in match w/ #2? Let's keep #3 PLAYING in different game ── -->
+          <article class="card playing">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">3</div>
+              <div class="login">eearx***021<span class="alias">zy135930 · steam3</span></div>
+              <span class="led on" style="color:var(--signal)"></span>
+            </header>
+            <div class="state-line"><span>SM·STATE</span><span class="now">GAME_IN_PROGRESS</span></div>
+            <div class="heroplate">
+              <div class="portrait"><svg><use href="#hero-li"/></svg></div>
+              <div class="hero-meta">
+                <div class="name">Lina</div>
+                <div class="role"><span class="member">◇ MEMBER</span> · party 2980<wbr>9988</div>
+                <div class="hpbar"><div class="fill dim" style="width:38%"></div><div class="label">194 / 510</div></div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v">31208</span></div>
+              <div class="row"><span class="k">Time</span><span class="v signal">12:04</span></div>
+              <div class="row"><span class="k">GC·msg</span><span class="v">1,142</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v">51ms</span></div>
+              <div class="row"><span class="k">Lobby</span><span class="v">7384088</span></div>
+              <div class="row"><span class="k">HB</span><span class="v signal">19ms</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a disabled">▶ Start</span>
+              <span class="a stop">⏹ Stop</span>
+              <span class="a">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <!-- ── #4 LOADING ── -->
+          <article class="card loading">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">4</div>
+              <div class="login">bupns***496<span class="alias">da904387 · steam4</span></div>
+              <span class="led warn" style="color:var(--warn)"></span>
+            </header>
+            <div class="state-line"><span>STATE</span><span class="now">DOTA_LOADING</span></div>
+            <div class="heroplate">
+              <div class="portrait empty">·</div>
+              <div class="hero-meta">
+                <div class="name dim">— spawning client —</div>
+                <div class="role">step 4/7 · client.dll</div>
+                <div class="progress"><div class="fill"></div></div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v">31532</span></div>
+              <div class="row"><span class="k">Elapsed</span><span class="v warn">00:42</span></div>
+              <div class="row"><span class="k">GC·msg</span><span class="v dim">—</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v">35ms</span></div>
+              <div class="row"><span class="k">Inject</span><span class="v warn">pending</span></div>
+              <div class="row"><span class="k">HB</span><span class="v dim">—</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a disabled">▶ Start</span>
+              <span class="a stop">⏹ Stop</span>
+              <span class="a disabled">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+        </div>
+
+        <!-- Active log -->
+        <div class="log-panel">
+          <div class="log-head">
+            <span>// orchestrator.log · live tail · 1840 lines/min</span>
+            <div class="filters">
+              <span class="chip is-on">ALL</span><span class="chip">BRAIN</span><span class="chip">GC</span><span class="chip">LUA</span><span class="chip">WARN</span>
+            </div>
+          </div>
+          <div class="log-body">
+            <div class="line"><span class="ts">11:11:07.570</span><span class="src lua">LUA</span><span class="msg">[require] OK: heroes.witch_doctor</span></div>
+            <div class="line"><span class="ts">11:11:07.572</span><span class="src lua">LUA</span><span class="msg">[require] OK: heroes.lina</span></div>
+            <div class="line"><span class="ts">11:11:07.581</span><span class="src brain">BRAIN</span><span class="msg">[heroes/init] <span class="hi">13</span> hero overrides loaded</span></div>
+            <div class="line"><span class="ts">11:11:07.581</span><span class="src brain">BRAIN</span><span class="msg">[bot_controller] camp coords overridden (was C++ stub)</span></div>
+            <div class="line"><span class="ts">11:11:07.582</span><span class="src brain">BRAIN</span><span class="msg">[BRAIN·WK <span class="hex">35336</span>] RegisterOnGameStateChange wired (event-driven)</span></div>
+            <div class="line"><span class="ts">11:11:07.582</span><span class="src brain">BRAIN</span><span class="msg">[bot_controller] loaded v2 FSM (<span class="hi">7</span> states, deterministic transitions)</span></div>
+            <div class="line"><span class="ts">11:11:07.582</span><span class="src brain">BRAIN</span><span class="msg">[BRAIN·WK <span class="hex">35336</span>] STATE-EVENT: <span class="hi">10</span> → <span class="hi">4</span></span></div>
+            <div class="line"><span class="ts">11:11:07.582</span><span class="src brain">BRAIN</span><span class="msg">[BRAIN·WK <span class="hex">35336</span>] NEW MATCH DETECTED — resetting per-match state</span></div>
+            <div class="line"><span class="ts">11:11:07.624</span><span class="src gc">GC</span><span class="msg">[wk·30532] match_found lobby=<span class="hex">0x70a4f4a</span> queue=ranked</span></div>
+            <div class="line"><span class="ts">11:11:07.701</span><span class="src gc">GC</span><span class="msg">[wk·31208] hp <span class="hi">510→194</span> dmg=blink+ult source=<span class="hi">npc_dota_hero_pudge</span></span></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </section>
+
+  <!-- ═════════════════════════ SCENE 3: CRASH ═════════════════════════ -->
+  <section class="scene" data-scene="crash">
+
+    <div class="controlbar">
+      <div class="control-actions">
+        <button class="btn recovery"><span class="ind"></span>⟲ Recover All</button>
+        <button class="btn"><span class="ind" style="background:var(--signal);box-shadow:0 0 6px var(--signal)"></span>Running · 4/5</button>
+        <button class="btn danger"><span class="ind"></span>Stop All</button>
+        <button class="btn">Settings</button>
+        <button class="btn">Logs</button>
+      </div>
+      <div class="control-status">
+        <span class="kv"><span class="k">HWID·SPOOFER</span><span class="v acc">ARMED</span></span>
+        <span class="kv"><span class="k">EXIT·IP</span><span class="v">185.244.173.210 / NL-AMS</span></span>
+        <span class="kv"><span class="k">SING-BOX</span><span class="v" style="color:var(--warn)">4/5</span></span>
+        <span class="kv"><span class="k">UPTIME</span><span class="v">04:18:42</span></span>
+      </div>
+    </div>
+
+    <div class="layout">
+
+      <aside class="rail">
+        <div class="panel bracketed tile" style="border-color:var(--crash-dim)">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4 style="color:var(--crash)">Anomaly</h4>
+          <div class="bigstat"><span class="num" style="color:var(--crash)">01</span><span class="unit">crash this hr</span></div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7;color:var(--ink-dim)">
+            <div><span class="mute">FAULT</span> <span class="bright">EXCEPTION_ACCESS_VIOLATION</span></div>
+            <div><span class="mute">CODE</span> <span class="gold">0xC0000005</span></div>
+            <div><span class="mute">MOD</span> <span class="bright">client.dll + 0x4af2c1</span></div>
+            <div><span class="mute">WHEN</span> <span class="bright">11:42:18.114</span></div>
+            <div style="margin-top:6px;color:var(--crash)">→ heartbeat lost <span class="bright">347s ago</span></div>
+          </div>
+        </div>
+
+        <div class="panel bracketed tile">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4>Recovery Plan</h4>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.85">
+            <div><span class="gold">▮</span> <span class="dim">archive crash dump</span></div>
+            <div><span class="gold">▮</span> <span class="dim">free profile mutex</span></div>
+            <div><span class="gold">▮</span> <span class="dim">re-spawn steam4.exe</span></div>
+            <div><span class="gold">▮</span> <span class="dim">await client.dll</span></div>
+            <div><span class="gold">▮</span> <span class="dim">re-inject Andromeda</span></div>
+            <div><span style="color:var(--ink-mute)">▯</span> <span class="dim">rejoin party / queue</span></div>
+            <div><span style="color:var(--ink-mute)">▯</span> <span class="dim">resume heartbeat</span></div>
+            <div style="margin-top:8px;color:var(--gold)">≈ ETA 38s · auto in 5s</div>
+          </div>
+        </div>
+
+        <div class="panel bracketed tile">
+          <span class="br-tr"></span><span class="br-bl"></span>
+          <h4>Session</h4>
+          <div class="bigstat"><span class="num">31</span><span class="unit">games · 4h</span></div>
+          <div class="minigrid">
+            <div class="row"><span class="k">Live</span><span class="v" style="color:var(--signal)">3</span></div>
+            <div class="row"><span class="k">Queue</span><span class="v" style="color:var(--queue)">1</span></div>
+            <div class="row"><span class="k">Crashed</span><span class="v" style="color:var(--crash)">1</span></div>
+            <div class="row"><span class="k">Loading</span><span class="v">0</span></div>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <div class="sep-ascii">┌── ACCOUNTS · 3 LIVE · 1 QUEUE · 1 CRASHED ── ⚠ INTERVENTION REQUIRED ─────────────────────────────────────────────────┐</div>
+        <div class="matrix">
+
+          <article class="card playing">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">0</div>
+              <div class="login">zrvqd***781<span class="alias">qt317792 · steam0</span></div>
+              <span class="led on" style="color:var(--signal)"></span>
+            </header>
+            <div class="state-line"><span>SM·STATE</span><span class="now">GAME_IN_PROGRESS</span></div>
+            <div class="heroplate">
+              <div class="portrait"><svg><use href="#hero-sn"/></svg></div>
+              <div class="hero-meta">
+                <div class="name">Sniper</div>
+                <div class="role"><span class="leader">◆ LEADER</span> · party 2981<wbr>2204</div>
+                <div class="hpbar"><div class="fill" style="width:91%"></div><div class="label">552 / 604</div></div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v">30672</span></div>
+              <div class="row"><span class="k">Time</span><span class="v signal">28:11</span></div>
+              <div class="row"><span class="k">GC·msg</span><span class="v">2,107</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v">38ms</span></div>
+              <div class="row"><span class="k">Lobby</span><span class="v">7384207</span></div>
+              <div class="row"><span class="k">HB</span><span class="v signal">9ms</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a disabled">▶ Start</span><span class="a stop">⏹ Stop</span><span class="a">⟳ DLL</span><span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <article class="card playing">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">1</div>
+              <div class="login">tqbao***585<span class="alias">tu483458 · steam1</span></div>
+              <span class="led on" style="color:var(--signal)"></span>
+            </header>
+            <div class="state-line"><span>SM·STATE</span><span class="now">GAME_IN_PROGRESS</span></div>
+            <div class="heroplate">
+              <div class="portrait"><svg><use href="#hero-li"/></svg></div>
+              <div class="hero-meta">
+                <div class="name">Lina</div>
+                <div class="role"><span class="member">◇ MEMBER</span> · party 2981<wbr>2204</div>
+                <div class="hpbar"><div class="fill" style="width:74%"></div><div class="label">377 / 510</div></div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v">30896</span></div>
+              <div class="row"><span class="k">Time</span><span class="v signal">28:11</span></div>
+              <div class="row"><span class="k">GC·msg</span><span class="v">2,104</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v">42ms</span></div>
+              <div class="row"><span class="k">Lobby</span><span class="v">7384207</span></div>
+              <div class="row"><span class="k">HB</span><span class="v signal">11ms</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a disabled">▶ Start</span><span class="a stop">⏹ Stop</span><span class="a">⟳ DLL</span><span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <article class="card queue">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">2</div>
+              <div class="login">orcby***349<span class="alias">lc669979 · steam2</span></div>
+              <span class="led queue" style="color:var(--queue)"></span>
+            </header>
+            <div class="state-line"><span>SM·STATE</span><span class="now">FINDING_MATCH</span></div>
+            <div class="heroplate">
+              <div class="portrait"><svg><use href="#hero-dr"/></svg></div>
+              <div class="hero-meta">
+                <div class="name">Drow Ranger</div>
+                <div class="role"><span class="leader">◆ LEADER</span> · solo</div>
+                <div class="progress queue"><div class="fill"></div></div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v">31264</span></div>
+              <div class="row"><span class="k">Q·Time</span><span class="v queue">04:38</span></div>
+              <div class="row"><span class="k">GC·msg</span><span class="v">1,402</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v">29ms</span></div>
+              <div class="row"><span class="k">Region</span><span class="v">EU-W</span></div>
+              <div class="row"><span class="k">HB</span><span class="v signal">14ms</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a disabled">▶ Start</span><span class="a stop">⏹ Stop</span><span class="a">⟳ DLL</span><span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <article class="card playing">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">3</div>
+              <div class="login">eearx***021<span class="alias">zy135930 · steam3</span></div>
+              <span class="led on" style="color:var(--signal)"></span>
+            </header>
+            <div class="state-line"><span>SM·STATE</span><span class="now">PRE_GAME</span></div>
+            <div class="heroplate">
+              <div class="portrait"><svg><use href="#hero-sk"/></svg></div>
+              <div class="hero-meta">
+                <div class="name">Skeleton King</div>
+                <div class="role"><span class="leader">◆ LEADER</span> · party 2981<wbr>3041</div>
+                <div class="hpbar"><div class="fill" style="width:100%"></div><div class="label">868 / 868</div></div>
+              </div>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID</span><span class="v">32068</span></div>
+              <div class="row"><span class="k">Time</span><span class="v signal">-1:14</span></div>
+              <div class="row"><span class="k">GC·msg</span><span class="v">488</span></div>
+              <div class="row"><span class="k">Ping</span><span class="v">51ms</span></div>
+              <div class="row"><span class="k">Lobby</span><span class="v">7384304</span></div>
+              <div class="row"><span class="k">HB</span><span class="v signal">17ms</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a disabled">▶ Start</span><span class="a stop">⏹ Stop</span><span class="a">⟳ DLL</span><span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+          <!-- ── #4 CRASHED ── -->
+          <article class="card crashed">
+            <div class="stripe"></div>
+            <header class="head">
+              <div class="ix">4</div>
+              <div class="login">bupns***496<span class="alias">da904387 · steam4</span></div>
+              <span class="led crash" style="color:var(--crash)"></span>
+            </header>
+            <div class="state-line"><span>STATE</span><span class="now">CRASHED · NO HEARTBEAT</span></div>
+            <div class="heroplate">
+              <div class="portrait empty" style="color:var(--crash)">!</div>
+              <div class="hero-meta">
+                <div class="name" style="color:var(--crash)">Process exited</div>
+                <div class="role">last hero · Witch Doctor · 18:42</div>
+              </div>
+            </div>
+            <div class="crash-detail">
+              <span class="lbl">Minidump</span>
+              <span class="path">C:\BotProfiles\steam4\dumps\<br/>dota2-31532-2026-04-29T11-42-18.dmp</span>
+            </div>
+            <div class="table">
+              <div class="row"><span class="k">PID·Last</span><span class="v">31532 ✕</span></div>
+              <div class="row"><span class="k">Fault</span><span class="v crash">0xC0000005</span></div>
+              <div class="row"><span class="k">Module</span><span class="v">client.dll</span></div>
+              <div class="row"><span class="k">Offset</span><span class="v">+0x4af2c1</span></div>
+              <div class="row"><span class="k">HB·Lost</span><span class="v crash">347s</span></div>
+              <div class="row"><span class="k">Auto·In</span><span class="v" style="color:var(--gold)">5s</span></div>
+            </div>
+            <footer class="actions">
+              <span class="a go">⟲ Recover</span>
+              <span class="a">📂 Dump</span>
+              <span class="a">⟳ DLL</span>
+              <span class="a">📋 Log</span>
+            </footer>
+          </article>
+
+        </div>
+
+        <!-- Crash log — error-flavoured -->
+        <div class="log-panel" style="border-color:var(--crash-dim)">
+          <div class="log-head" style="border-bottom-color:var(--crash-dim)">
+            <span style="color:var(--crash)">// orchestrator.log · ANOMALY trace · #4</span>
+            <div class="filters">
+              <span class="chip">ALL</span><span class="chip">BRAIN</span><span class="chip">GC</span><span class="chip">LUA</span><span class="chip is-on" style="color:var(--crash);border-color:var(--crash-dim)">CRASH</span>
+            </div>
+          </div>
+          <div class="log-body">
+            <div class="line"><span class="ts">11:42:17.998</span><span class="src brain">BRAIN</span><span class="msg">[BRAIN·WK <span class="hex">31532</span>] tick #1140 · hp 422/604 · alive=true</span></div>
+            <div class="line"><span class="ts">11:42:18.114</span><span class="src warn">WARN</span><span class="msg">[wk·31532] heartbeat overdue: <span class="hi">2300ms</span> (threshold 1500ms)</span></div>
+            <div class="line"><span class="ts">11:42:18.115</span><span class="src crash">CRASH</span><span class="msg">[wk·31532] EXCEPTION_ACCESS_VIOLATION at <span class="hex">client.dll+0x4af2c1</span></span></div>
+            <div class="line"><span class="ts">11:42:18.116</span><span class="src crash">CRASH</span><span class="msg">[wk·31532] dump → <span class="hi">C:\BotProfiles\steam4\dumps\dota2-31532-2026-04-29T11-42-18.dmp</span></span></div>
+            <div class="line"><span class="ts">11:42:18.122</span><span class="src">orch</span><span class="msg">[#4] proxy hook unloaded · exit IP slot freed</span></div>
+            <div class="line"><span class="ts">11:42:18.140</span><span class="src">orch</span><span class="msg">[#4] mutex SteamClient_BotProfile_steam4 released via handle64.exe</span></div>
+            <div class="line"><span class="ts">11:42:18.155</span><span class="src">orch</span><span class="msg">[#4] cooldown <span class="hi">600s</span> respected? <span class="hi">YES</span> (last launch 04:18:11 ago)</span></div>
+            <div class="line"><span class="ts">11:42:23.000</span><span class="src brain">BRAIN</span><span class="msg">[#4] auto-recovery armed · respawn in <span class="hi">5s</span> · operator can cancel</span></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <span><span class="ascii">└──</span> DotaFarm · Andromeda Toolchain · ©2026 — for educational reverse-engineering coursework</span>
+    <span>FRAME 60Hz · IMGUI 1.91.5 · DX11 · 1480 × 940</span>
+  </footer>
+
+</div>
+
+<script>
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const target = b.dataset.scene;
+      document.querySelectorAll('.tab-btn').forEach(x => x.classList.toggle('is-active', x === b));
+      document.querySelectorAll('.scene').forEach(s => s.classList.toggle('is-active', s.dataset.scene === target));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+
+  // Log auto-scroll fake — append a new realistic line every ~1.5s in active scene
+  const activeBody = document.querySelector('.scene[data-scene="active"] .log-body');
+  if (activeBody) {
+    const lines = [
+      ['BRAIN', 'brain', '[BRAIN·WK <span class="hex">30532</span>] tick #2841 · hp 868/868 · alive=true · pos (3742, -4128)'],
+      ['GC',    'gc',    '[wk·35336] gc_msg type=k_EMsgGCToClientMatchInfo size=314'],
+      ['LUA',   'lua',   '[bot_controller] FSM: STATE_LANE → STATE_FARM (lane safe, hp ≥ 80%)'],
+      ['BRAIN', 'brain', '[BRAIN·WK <span class="hex">31208</span>] retreat triggered · enemy in 480u · hp 38%'],
+      ['GC',    'gc',    '[wk·30532] party_invite_sent → 76561198716525725 · pending_id <span class="hex">0x6997d2ea</span>'],
+      ['LUA',   'lua',   '[item_build] purchased <span class="hi">item_quelling_blade</span> · gold 0/200'],
+      ['BRAIN', 'brain', '[BRAIN·WK <span class="hex">37824</span>] queue tick · in_queue=true · result_code=-1 · t=2:14'],
+      ['orch',  '',      'gsi snapshot ingested · 5 dota_ids · avg latency 23ms'],
+    ];
+    let i = 0;
+    setInterval(() => {
+      const [src, cls, msg] = lines[i++ % lines.length];
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,'0');
+      const mm = String(now.getMinutes()).padStart(2,'0');
+      const ss = String(now.getSeconds()).padStart(2,'0');
+      const ms = String(now.getMilliseconds()).padStart(3,'0');
+      const div = document.createElement('div');
+      div.className = 'line';
+      div.innerHTML = `<span class="ts">${hh}:${mm}:${ss}.${ms}</span><span class="src ${cls}">${src}</span><span class="msg">${msg}</span>`;
+      activeBody.appendChild(div);
+      // keep last 14
+      while (activeBody.children.length > 14) activeBody.removeChild(activeBody.firstChild);
+      activeBody.scrollTop = activeBody.scrollHeight;
+    }, 1500);
+  }
+</script>
+
+</body>
+</html>

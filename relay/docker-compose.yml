@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  relay:
+    build: .
+    image: dota_relay:latest
+    container_name: dota_relay
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+      - "127.0.0.1:5051:5051"   # admin/metrics — только loopback хоста
+    environment:
+      - RELAY_BIND=:5050
+      - RELAY_ADMIN_BIND=:5051
+      - RELAY_ADMIN_TOKEN=${RELAY_ADMIN_TOKEN:-}
+      - RELAY_USERS_FILE=/etc/dota_relay/users.json
+      - RELAY_USERS_RELOAD_INTERVAL_S=30
+      - RELAY_BUFFER_PER_PAIR=10
+      - RELAY_MAX_PAIRS_GLOBAL=10000
+      - RELAY_PEER_TIMEOUT_S=30
+      - RELAY_HELLO_DEADLINE_S=5
+      - RELAY_MAX_LINE_BYTES=65536
+      - RELAY_CONNECT_RATELIMIT_PER_MIN=10
+      - RELAY_LOG_LEVEL=info
+    volumes:
+      - ./users.json:/etc/dota_relay/users.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5051/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

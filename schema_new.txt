@@ -1,0 +1,259 @@
+[*] Connecting to Dota 2...
+[+] PID: 22988
+[*] Dumping SchemaSystem...
+  [+] Inferred C_BaseEntity from npc_dota_hero_void_spirit: {'m_iHealth': 844, 'm_iMaxHealth': 840, 'm_lifeState': 848, 'm_iTeamNum': 1003, 'm_pGameSceneNode': 824}
+  [+] Using verified fallback for C_DOTABaseAbility
+[+] CDOTAGamerules: 0x4a0c98c0000
+  [+] Inferred GamerulesProxy.m_pGameRules = 0x5f0 (state=4)
+[+] Found 8 classes:
+    CDOTAGamerules: 6 fields
+    CGameSceneNode: 1 fields
+    C_BaseEntity: 5 fields
+    C_DOTABaseAbility: 10 fields
+    C_DOTAGamerulesProxy: 1 fields
+    C_DOTAPlayerController: 108 fields
+    C_DOTA_BaseNPC: 208 fields
+    C_DOTA_BaseNPC_Hero: 68 fields
+[+] Raw dump saved to C:\Users\aleks\OneDrive\Документы\реверс курс\tools\dota2\schema_dump.json
+[!] WARNING: 2 required fields NOT found in SchemaSystem:
+    - CDOTAGamerules.m_nHeroPickState
+    - CDOTAGamerules.m_flStateTransitionTime
+    These classes may not be in schema (base classes, embedded structs).
+    Will use previous known values where available.
+
+============================================================
+Generated offsets.py (use --apply to write):
+============================================================
+"""
+Dota 2 Offsets - AUTO-GENERATED from SchemaSystem runtime dump.
+Do NOT edit manually. Run dump_schema_offsets.py --apply to regenerate.
+"""
+
+# === Patterns (for runtime scanning) ===
+class Patterns:
+    CREATE_INTERFACE = "4C 8B ?? ?? ?? ?? ?? 4C 8B ?? 4C 8B ?? 4D 85 ?? 74 ?? 49 8B ?? ?? 4D 8B"
+
+# === Interface names ===
+class Interfaces:
+    GAME_RESOURCE_SERVICE = "GameResourceServiceClientV001"
+    SOURCE2_CLIENT = "Source2Client002"
+    SCHEMA_SYSTEM = "SchemaSystem_001"
+    CVAR = "VEngineCvar007"
+
+# === SchemaSystem layout (runtime verified) ===
+class SchemaSystem:
+    SCOPES_LIST = 0x198
+    SCOPE_NAME = 0x8
+    CONTAINERS_ARRAY = 0x580
+    CONTAINERS_ARRAY_STRIDE = 0x28
+    CONTAINERS_MAX = 256
+    CONTAINER_PTR = 0x18
+    CLASS_DESC_STRIDE = 0x20
+    CLASS_DESC_PTR = 0x10
+
+# === CGameResourceService ===
+class GameResourceService:
+    ENTITY_SYSTEM = 0x58
+
+# === CGameEntitySystem ===
+class EntitySystem:
+    CHUNK_LISTS = [0x10, 0x18, 0x20]
+    FIRST_IDENTITY = 0x210
+    MAX_CHUNKS = 64
+    SLOTS_PER_CHUNK = 512
+
+# === CEntityIdentity (stride 0x78) ===
+class EntityIdentity:
+    STRIDE = 0x78
+    ENTITY_PTR = 0x00
+    SCHEMA_CLASS_BINDING = 0x08
+    HANDLE = 0x10
+    NAME = 0x18
+    DESIGNER_NAME = 0x20
+    FLAGS = 0x30
+    PREV = 0x58
+    NEXT = 0x60
+
+# === CEntityInstance ===
+class EntityInstance:
+    IDENTITY = 0x10
+
+# === C_DOTAGamerulesProxy (schema dump) ===
+class GamerulesProxy:
+    GAMERULES = 0x5F0  # m_pGameRules
+
+# === CDOTAGamerules (schema dump) ===
+class Gamerules:
+    PAUSED = 0x38  # m_bGamePaused
+    SERVER_GAME_STATE = 0x74  # m_nServerGameState
+    GAME_STATE = 0x7C  # m_nGameState
+    GAME_MODE = 0xE4  # m_nGameMode
+    GAME_TIME = 0x30  # m_flGameTime
+    GAME_START_TIME = 0x34  # m_flGameStartTime
+
+# === C_BaseEntity (schema dump) ===
+class BaseEntity:
+    GAME_SCENE_NODE = 0x338  # m_pGameSceneNode
+    MAX_HEALTH = 0x348  # m_iMaxHealth
+    HEALTH = 0x34C  # m_iHealth
+    LIFE_STATE = 0x350  # m_lifeState
+    TEAM_NUM = 0x3EB  # m_iTeamNum
+
+# === CGameSceneNode (schema dump) ===
+class GameSceneNode:
+    VEC_ABS_ORIGIN = 0xD0  # Vector3 (float x,y,z)
+
+# === C_DOTA_BaseNPC (schema dump) ===
+class BaseNPC:
+    CURRENT_LEVEL = 0xB94  # m_iCurrentLevel
+    MANA = 0xBEC  # m_flMana
+    MAX_MANA = 0xBF0  # m_flMaxMana
+    MANA_REGEN = 0x1628  # m_flManaRegen
+    HEALTH_REGEN = 0x162C  # m_flHealthRegen
+    DAMAGE_MIN = 0xD08  # m_iDamageMin
+    DAMAGE_MAX = 0xD0C  # m_iDamageMax
+    UNIT_NAME = 0xC60  # m_iszUnitName
+    MODIFIER_MANAGER = 0xD20  # m_ModifierManager
+    UNIT_STATE_64 = 0x1190  # m_nUnitState64
+    UNIT_DEBUFF_STATE = 0x11A0  # m_nUnitDebuffState
+    ATTACK_RANGE = 0xBC0  # m_iAttackRange
+    MOVE_SPEED = 0xBD4  # m_iMoveSpeed
+    BASE_ATTACK_TIME = 0xBDC  # m_flBaseAttackTime
+    BASE_ATTACK_SPEED = 0xBD8  # m_iBaseAttackSpeed
+    IS_ILLUSION = 0xC14  # m_bIsIllusion
+    IS_PHANTOM = 0xB78  # m_bIsPhantom
+    DAY_VISION_RANGE = 0xD00  # m_iDayTimeVisionRange
+    NIGHT_VISION_RANGE = 0xD04  # m_iNightTimeVisionRange
+    PHYSICAL_ARMOR = 0x1510  # m_flPhysicalArmorValue
+    MAGIC_RESIST = 0x1514  # m_flMagicalResistanceValue
+    HAS_INVENTORY = 0x11A8  # m_bHasInventory
+    # m_vecAbilities: CNetworkUtlVectorBase at schema 0xC18
+    # Layout: [count(4)][pad(4)][data_ptr(8)][count(4)]
+    ABILITIES_COUNT = 0xC18  # int32 count
+    ABILITIES_PTR = 0xC20  # ptr to CHandle[] array
+    # m_Inventory: C_DOTA_UnitInventory at schema 0x1098
+    INVENTORY = 0x1098
+    # m_hItems: INLINE CHandle[25] inside inventory
+    ITEMS_COUNT = 0x10B8  # int32 (inventory+0x20)
+    ITEMS_INLINE = 0x10BC  # CHandle[25] inline (inventory+0x24)
+
+# === C_DOTABaseAbility (schema dump) ===
+class BaseAbility:
+    LEVEL = 0x628  # m_iLevel
+    COOLDOWN = 0x638  # m_fCooldown
+    COOLDOWN_LENGTH = 0x63C  # m_flCooldownLength
+    MANA_COST = 0x640  # m_iManaCost
+    HIDDEN = 0x617  # m_bHidden
+    ACTIVATED = 0x619  # m_bActivated
+    TOGGLE_STATE = 0x62D  # m_bToggleState
+    AUTOCAST_STATE = 0x644  # m_bAutoCastState
+    CHARGES = 0x660  # m_nAbilityCurrentCharges
+    CHARGE_RESTORE_TIME = 0x664  # m_fAbilityChargeRestoreTimeRemaining
+
+# === C_DOTA_BaseNPC_Hero (schema dump) ===
+class BaseHero:
+    CURRENT_XP = 0x19A4  # m_iCurrentXP
+    ABILITY_POINTS = 0x19A8  # m_iAbilityPoints
+    STRENGTH = 0x19C0  # m_flStrength
+    AGILITY = 0x19C4  # m_flAgility
+    INTELLECT = 0x19C8  # m_flIntellect
+    STRENGTH_TOTAL = 0x19CC  # m_flStrengthTotal
+    AGILITY_TOTAL = 0x19D0  # m_flAgilityTotal
+    INTELLECT_TOTAL = 0x19D4  # m_flIntellectTotal
+    PLAYER_ID = 0x1A48  # m_iPlayerID
+    RESPAWN_TIME = 0x19B8  # m_flRespawnTime
+
+# === m_nUnitState64 bit flags (MODIFIER_STATE_* enum) ===
+class UnitState:
+    ROOTED                                     = 1 << 0
+    DISARMED                                   = 1 << 1
+    ATTACK_IMMUNE                              = 1 << 2
+    SILENCED                                   = 1 << 3
+    MUTED                                      = 1 << 4
+    STUNNED                                    = 1 << 5
+    HEXED                                      = 1 << 6
+    INVISIBLE                                  = 1 << 7
+    INVULNERABLE                               = 1 << 8
+    MAGIC_IMMUNE                               = 1 << 9
+    PROVIDES_VISION                            = 1 << 10
+    NIGHTMARED                                 = 1 << 11
+    BLOCK_DISABLED                             = 1 << 12
+    EVADE_DISABLED                             = 1 << 13
+    UNSELECTABLE                               = 1 << 14
+    CANNOT_MISS                                = 1 << 15
+    SPECIALLY_DENIABLE                         = 1 << 16
+    FROZEN                                     = 1 << 17
+    COMMAND_RESTRICTED                         = 1 << 18
+    NOT_ON_MINIMAP                             = 1 << 19
+    LOW_ATTACK_PRIORITY                        = 1 << 20
+    NO_HEALTH_BAR                              = 1 << 21
+    FLYING                                     = 1 << 22
+    NO_UNIT_COLLISION                          = 1 << 23
+    NO_TEAM_MOVE_TO                            = 1 << 24
+    NO_TEAM_SELECT                             = 1 << 25
+    PASSIVES_DISABLED                          = 1 << 26
+    DOMINATED                                  = 1 << 27
+    BLIND                                      = 1 << 28
+    OUT_OF_GAME                                = 1 << 29
+    FAKE_ALLY                                  = 1 << 30
+    FLYING_FOR_PATHING_PURPOSES_ONLY           = 1 << 31
+    TRUESIGHT_IMMUNE                           = 1 << 32
+    UNTARGETABLE                               = 1 << 33
+    IGNORING_MOVE_AND_ATTACK_ORDERS            = 1 << 34
+    ALLOW_PATHING_THROUGH_TREES                = 1 << 35
+    NOT_ON_MINIMAP_FOR_ENEMIES                 = 1 << 36
+    DEBUFF_IMMUNE                              = 1 << 37
+
+# === Game State Enum ===
+class GameState:
+    INIT = 0
+    WAIT_FOR_PLAYERS = 1
+    HERO_SELECTION = 2
+    STRATEGY_TIME = 3
+    PRE_GAME = 4
+    GAME_IN_PROGRESS = 5
+    POST_GAME = 6
+    DISCONNECT = 7
+    NAMES = {
+        0: "INIT",
+        1: "WAIT_FOR_PLAYERS",
+        2: "HERO_SELECTION",
+        3: "STRATEGY_TIME",
+        4: "PRE_GAME",
+        5: "GAME_IN_PROGRESS",
+        6: "POST_GAME",
+        7: "DISCONNECT",
+    }
+
+# === Teams ===
+class Team:
+    SPECTATOR = 1
+    RADIANT = 2
+    DIRE = 3
+
+# === PrepareUnitOrders (client.dll) ===
+PREPARE_UNIT_ORDERS_RVA = 0x1D16120  # AOB-scanned, verify per build
+
+# === CDOTAPlayerController (schema dump) ===
+class PlayerController:
+    PLAYER_SLOT = 0x900  # m_nPlayerID
+    ASSIGNED_HERO = 0x904  # m_hAssignedHero
+    LAST_ASSIGNED_HERO = 0x908  # m_hLastAssignedHero
+    PLAYER_NAME = 0x6E0  # inline string (not in schema)
+
+# === C_DOTA_DataNonSpectator (gold, per-team player data) ===
+# NOTE: This is an embedded entity, may need special handling
+class DataNonSpectator:
+    DATA_TEAM_PTR = 0x5F0   # TODO: verify via runtime scan
+    DATA_TEAM_COUNT = 0x5F8
+    DATA_TEAM_PLAYER_STRIDE = 0x1220  # TODO: verify
+
+class DataTeamPlayer:
+    RELIABLE_GOLD = 0x30
+    UNRELIABLE_GOLD = 0x34
+    TOTAL_EARNED_GOLD = 0x3C
+    NET_WORTH = 0x8C
+    LAST_HITS = 0x94
+    DENIES = 0x98
+
+

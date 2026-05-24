@@ -1,0 +1,1634 @@
+{
+  "C_DOTA_BaseNPC_Hero": {
+    "m_bDisableWearables": {
+      "offset": 6560,
+      "hex": "0x19A0"
+    },
+    "m_iCurrentXP": {
+      "offset": 6564,
+      "hex": "0x19A4"
+    },
+    "m_iAbilityPoints": {
+      "offset": 6568,
+      "hex": "0x19A8"
+    },
+    "m_iTotalAbilityPoints": {
+      "offset": 6572,
+      "hex": "0x19AC"
+    },
+    "m_iAghanimsAbilityPoints": {
+      "offset": 6576,
+      "hex": "0x19B0"
+    },
+    "m_iTotalAghanimsAbilityPoints": {
+      "offset": 6580,
+      "hex": "0x19B4"
+    },
+    "m_flRespawnTime": {
+      "offset": 6584,
+      "hex": "0x19B8"
+    },
+    "m_flRespawnTimePenalty": {
+      "offset": 6588,
+      "hex": "0x19BC"
+    },
+    "m_flStrength": {
+      "offset": 6592,
+      "hex": "0x19C0"
+    },
+    "m_flAgility": {
+      "offset": 6596,
+      "hex": "0x19C4"
+    },
+    "m_flIntellect": {
+      "offset": 6600,
+      "hex": "0x19C8"
+    },
+    "m_flStrengthTotal": {
+      "offset": 6604,
+      "hex": "0x19CC"
+    },
+    "m_flAgilityTotal": {
+      "offset": 6608,
+      "hex": "0x19D0"
+    },
+    "m_flIntellectTotal": {
+      "offset": 6612,
+      "hex": "0x19D4"
+    },
+    "m_hFacetAbilities": {
+      "offset": 6616,
+      "hex": "0x19D8"
+    },
+    "m_vecHiddenLoadoutSlots": {
+      "offset": 6640,
+      "hex": "0x19F0"
+    },
+    "m_iRecentDamage": {
+      "offset": 6664,
+      "hex": "0x1A08"
+    },
+    "m_fPainFactor": {
+      "offset": 6668,
+      "hex": "0x1A0C"
+    },
+    "m_fTargetPainFactor": {
+      "offset": 6672,
+      "hex": "0x1A10"
+    },
+    "m_bLifeState": {
+      "offset": 6676,
+      "hex": "0x1A14"
+    },
+    "m_bFirstSpawn": {
+      "offset": 6677,
+      "hex": "0x1A15"
+    },
+    "m_nFXStunIndex": {
+      "offset": 6680,
+      "hex": "0x1A18"
+    },
+    "m_nFXSilenceIndex": {
+      "offset": 6684,
+      "hex": "0x1A1C"
+    },
+    "m_nFXDeathIndex": {
+      "offset": 6688,
+      "hex": "0x1A20"
+    },
+    "m_iPlayerID": {
+      "offset": 6728,
+      "hex": "0x1A48"
+    },
+    "m_iHeroFacetKey": {
+      "offset": 6736,
+      "hex": "0x1A50"
+    },
+    "m_iEconSpecifyingPlayerID": {
+      "offset": 6744,
+      "hex": "0x1A58"
+    },
+    "m_hReplicatingOtherHeroModel": {
+      "offset": 6748,
+      "hex": "0x1A5C"
+    },
+    "m_bReincarnating": {
+      "offset": 6752,
+      "hex": "0x1A60"
+    },
+    "m_bCustomKillEffect": {
+      "offset": 6753,
+      "hex": "0x1A61"
+    },
+    "m_flSpawnedAt": {
+      "offset": 6756,
+      "hex": "0x1A64"
+    },
+    "m_bScriptDisableRespawns": {
+      "offset": 6760,
+      "hex": "0x1A68"
+    },
+    "m_iPrimaryAttribute": {
+      "offset": 6764,
+      "hex": "0x1A6C"
+    },
+    "m_nLastDrawnHealth": {
+      "offset": 6768,
+      "hex": "0x1A70"
+    },
+    "m_flHurtAmount": {
+      "offset": 6772,
+      "hex": "0x1A74"
+    },
+    "m_flLastHurtTime": {
+      "offset": 6776,
+      "hex": "0x1A78"
+    },
+    "m_flHurtDecayRate": {
+      "offset": 6780,
+      "hex": "0x1A7C"
+    },
+    "m_flHealAmount": {
+      "offset": 6784,
+      "hex": "0x1A80"
+    },
+    "m_flLastHealTime": {
+      "offset": 6788,
+      "hex": "0x1A84"
+    },
+    "m_flHealDecayRate": {
+      "offset": 6792,
+      "hex": "0x1A88"
+    },
+    "m_bIsFirstTimeHeal": {
+      "offset": 6796,
+      "hex": "0x1A8C"
+    },
+    "m_flLastDispellTime": {
+      "offset": 6800,
+      "hex": "0x1A90"
+    },
+    "m_flDispellAnimationAmount": {
+      "offset": 6804,
+      "hex": "0x1A94"
+    },
+    "m_flDeathAnimationAmount": {
+      "offset": 6808,
+      "hex": "0x1A98"
+    },
+    "m_flLastDeathTime": {
+      "offset": 6812,
+      "hex": "0x1A9C"
+    },
+    "m_flLastTreeShakeTime": {
+      "offset": 6816,
+      "hex": "0x1AA0"
+    },
+    "m_CenterOnHeroCooldownTimer": {
+      "offset": 6824,
+      "hex": "0x1AA8"
+    },
+    "m_CombinedModels": {
+      "offset": 7368,
+      "hex": "0x1CC8"
+    },
+    "m_nCurrentCombinedModelIndex": {
+      "offset": 7400,
+      "hex": "0x1CE8"
+    },
+    "m_nPendingCombinedModelIndex": {
+      "offset": 7404,
+      "hex": "0x1CEC"
+    },
+    "m_iHeroID": {
+      "offset": 7408,
+      "hex": "0x1CF0"
+    },
+    "m_flCheckLegacyItemsAt": {
+      "offset": 7412,
+      "hex": "0x1CF4"
+    },
+    "m_bDisplayAdditionalHeroes": {
+      "offset": 7416,
+      "hex": "0x1CF8"
+    },
+    "m_CombinedParticleModels": {
+      "offset": 7432,
+      "hex": "0x1D08"
+    },
+    "m_vecAttachedParticleIndeces": {
+      "offset": 7464,
+      "hex": "0x1D28"
+    },
+    "m_hPets": {
+      "offset": 7488,
+      "hex": "0x1D40"
+    },
+    "m_nKillStreakFX": {
+      "offset": 7512,
+      "hex": "0x1D58"
+    },
+    "m_nKillStreakFXTier": {
+      "offset": 7516,
+      "hex": "0x1D5C"
+    },
+    "m_bBuybackDisabled": {
+      "offset": 0,
+      "hex": "0x0"
+    },
+    "m_bWasFrozen": {
+      "offset": 0,
+      "hex": "0x0"
+    },
+    "m_bUpdateClientsideWearables": {
+      "offset": 0,
+      "hex": "0x0"
+    },
+    "m_bForceBuildCombinedModel": {
+      "offset": 0,
+      "hex": "0x0"
+    },
+    "m_bRecombineForMaterialsOnly": {
+      "offset": 0,
+      "hex": "0x0"
+    },
+    "m_bBuildingCombinedModel": {
+      "offset": 0,
+      "hex": "0x0"
+    },
+    "m_bInReloadEvent": {
+      "offset": 0,
+      "hex": "0x0"
+    },
+    "m_bStoreOldVisibility": {
+      "offset": 0,
+      "hex": "0x0"
+    },
+    "m_bResetVisibility": {
+      "offset": 0,
+      "hex": "0x0"
+    },
+    "m_bStoredVisibility": {
+      "offset": 0,
+      "hex": "0x0"
+    }
+  },
+  "C_DOTA_BaseNPC": {
+    "m_bIsPhantom": {
+      "offset": 2936,
+      "hex": "0xB78"
+    },
+    "m_iUnitType": {
+      "offset": 2940,
+      "hex": "0xB7C"
+    },
+    "m_bSelectionRingVisible": {
+      "offset": 2960,
+      "hex": "0xB90"
+    },
+    "m_iCurrentLevel": {
+      "offset": 2964,
+      "hex": "0xB94"
+    },
+    "m_bIsAncient": {
+      "offset": 2968,
+      "hex": "0xB98"
+    },
+    "m_bIsBossCreature": {
+      "offset": 2969,
+      "hex": "0xB99"
+    },
+    "m_bStolenScepter": {
+      "offset": 2970,
+      "hex": "0xB9A"
+    },
+    "m_bIsNeutralUnitType": {
+      "offset": 2971,
+      "hex": "0xB9B"
+    },
+    "m_bSelectOnSpawn": {
+      "offset": 2972,
+      "hex": "0xB9C"
+    },
+    "m_bCachedReplicatedMorphlingIllusion": {
+      "offset": 2973,
+      "hex": "0xB9D"
+    },
+    "m_bIgnoreAddSummonedToSelection": {
+      "offset": 2974,
+      "hex": "0xB9E"
+    },
+    "m_bConsideredHero": {
+      "offset": 2975,
+      "hex": "0xB9F"
+    },
+    "m_bUsesConstantGesture": {
+      "offset": 2976,
+      "hex": "0xBA0"
+    },
+    "m_bUseHeroAbilityNumbers": {
+      "offset": 2977,
+      "hex": "0xBA1"
+    },
+    "m_bHasSharedAbilities": {
+      "offset": 2978,
+      "hex": "0xBA2"
+    },
+    "m_bIsSummoned": {
+      "offset": 2979,
+      "hex": "0xBA3"
+    },
+    "m_bCanBeDominated": {
+      "offset": 2980,
+      "hex": "0xBA4"
+    },
+    "m_bHasUpgradeableAbilities": {
+      "offset": 2981,
+      "hex": "0xBA5"
+    },
+    "m_flHealthThinkRegen": {
+      "offset": 2984,
+      "hex": "0xBA8"
+    },
+    "m_iIsControllableByPlayer64": {
+      "offset": 2992,
+      "hex": "0xBB0"
+    },
+    "m_nHealthBarOffsetOverride": {
+      "offset": 3000,
+      "hex": "0xBB8"
+    },
+    "m_bCanRespawn": {
+      "offset": 3004,
+      "hex": "0xBBC"
+    },
+    "m_iAttackRange": {
+      "offset": 3008,
+      "hex": "0xBC0"
+    },
+    "m_bIsClone": {
+      "offset": 3012,
+      "hex": "0xBC4"
+    },
+    "m_colorGemColor": {
+      "offset": 3013,
+      "hex": "0xBC5"
+    },
+    "m_bHasColorGem": {
+      "offset": 3017,
+      "hex": "0xBC9"
+    },
+    "m_nFXDeniableIndex": {
+      "offset": 3020,
+      "hex": "0xBCC"
+    },
+    "m_nCustomHealthbarStyle": {
+      "offset": 3024,
+      "hex": "0xBD0"
+    },
+    "m_iMoveSpeed": {
+      "offset": 3028,
+      "hex": "0xBD4"
+    },
+    "m_iBaseAttackSpeed": {
+      "offset": 3032,
+      "hex": "0xBD8"
+    },
+    "m_flBaseAttackTime": {
+      "offset": 3036,
+      "hex": "0xBDC"
+    },
+    "m_iUnitNameIndex": {
+      "offset": 3040,
+      "hex": "0xBE0"
+    },
+    "m_iHealthBarOffset": {
+      "offset": 3044,
+      "hex": "0xBE4"
+    },
+    "m_iHealthBarHighlightColor": {
+      "offset": 3048,
+      "hex": "0xBE8"
+    },
+    "m_flMana": {
+      "offset": 3052,
+      "hex": "0xBEC"
+    },
+    "m_flMaxMana": {
+      "offset": 3056,
+      "hex": "0xBF0"
+    },
+    "m_flManaThinkRegen": {
+      "offset": 3060,
+      "hex": "0xBF4"
+    },
+    "m_iBKBChargesUsed": {
+      "offset": 3064,
+      "hex": "0xBF8"
+    },
+    "m_iAeonChargesUsed": {
+      "offset": 3068,
+      "hex": "0xBFC"
+    },
+    "m_iRefresherChargesUsed": {
+      "offset": 3072,
+      "hex": "0xC00"
+    },
+    "m_flRefresherUseTime": {
+      "offset": 3076,
+      "hex": "0xC04"
+    },
+    "m_flRefresherLastCooldown": {
+      "offset": 3080,
+      "hex": "0xC08"
+    },
+    "m_flLastDealtDamageTime": {
+      "offset": 3084,
+      "hex": "0xC0C"
+    },
+    "m_iBotDebugData": {
+      "offset": 3088,
+      "hex": "0xC10"
+    },
+    "m_bIsIllusion": {
+      "offset": 3092,
+      "hex": "0xC14"
+    },
+    "m_bHasClientSeenIllusionModifier": {
+      "offset": 3093,
+      "hex": "0xC15"
+    },
+    "m_vecAbilities": {
+      "offset": 3096,
+      "hex": "0xC18"
+    },
+    "m_vecAbilitiesClientPrediction": {
+      "offset": 3120,
+      "hex": "0xC30"
+    },
+    "m_nLocalAbilityBarSequenceNumber": {
+      "offset": 3144,
+      "hex": "0xC48"
+    },
+    "m_flInvisibilityLevel": {
+      "offset": 3148,
+      "hex": "0xC4C"
+    },
+    "m_flHullRadius": {
+      "offset": 3152,
+      "hex": "0xC50"
+    },
+    "m_flCollisionPadding": {
+      "offset": 3156,
+      "hex": "0xC54"
+    },
+    "m_flRingRadius": {
+      "offset": 3160,
+      "hex": "0xC58"
+    },
+    "m_flProjectileCollisionSize": {
+      "offset": 3164,
+      "hex": "0xC5C"
+    },
+    "m_iszUnitName": {
+      "offset": 3168,
+      "hex": "0xC60"
+    },
+    "m_iszUnitNameIconOverride": {
+      "offset": 3176,
+      "hex": "0xC68"
+    },
+    "m_iszParticleFolder": {
+      "offset": 3184,
+      "hex": "0xC70"
+    },
+    "m_iszSoundSet": {
+      "offset": 3192,
+      "hex": "0xC78"
+    },
+    "m_iszSelectionGroup": {
+      "offset": 3200,
+      "hex": "0xC80"
+    },
+    "m_iszVoiceFile": {
+      "offset": 3208,
+      "hex": "0xC88"
+    },
+    "m_iszGameSoundsFile": {
+      "offset": 3216,
+      "hex": "0xC90"
+    },
+    "m_iszVoiceBackgroundSound": {
+      "offset": 3224,
+      "hex": "0xC98"
+    },
+    "m_iszIdleSoundLoop": {
+      "offset": 3232,
+      "hex": "0xCA0"
+    },
+    "m_szUnitLabel": {
+      "offset": 3240,
+      "hex": "0xCA8"
+    },
+    "m_szScaleset": {
+      "offset": 3248,
+      "hex": "0xCB0"
+    },
+    "m_nUnitLabelIndex": {
+      "offset": 3256,
+      "hex": "0xCB8"
+    },
+    "m_strAnimationModifier": {
+      "offset": 3264,
+      "hex": "0xCC0"
+    },
+    "m_TerrainSpecificFootstepEffect": {
+      "offset": 3272,
+      "hex": "0xCC8"
+    },
+    "m_bUseCustomTerrainWeatherEffect": {
+      "offset": 3280,
+      "hex": "0xCD0"
+    },
+    "m_bHasClientSoundReplacement": {
+      "offset": 3281,
+      "hex": "0xCD1"
+    },
+    "m_bHasClientReplacementParticle": {
+      "offset": 3282,
+      "hex": "0xCD2"
+    },
+    "m_bResourcesLoaded": {
+      "offset": 3304,
+      "hex": "0xCE8"
+    },
+    "m_flTauntCooldown": {
+      "offset": 3308,
+      "hex": "0xCEC"
+    },
+    "m_flTauntCooldown2": {
+      "offset": 3312,
+      "hex": "0xCF0"
+    },
+    "m_iCurShop": {
+      "offset": 3316,
+      "hex": "0xCF4"
+    },
+    "m_szCurShopEntName": {
+      "offset": 3320,
+      "hex": "0xCF8"
+    },
+    "m_iDayTimeVisionRange": {
+      "offset": 3328,
+      "hex": "0xD00"
+    },
+    "m_iNightTimeVisionRange": {
+      "offset": 3332,
+      "hex": "0xD04"
+    },
+    "m_iDamageMin": {
+      "offset": 3336,
+      "hex": "0xD08"
+    },
+    "m_iDamageMax": {
+      "offset": 3340,
+      "hex": "0xD0C"
+    },
+    "m_iDamageBonus": {
+      "offset": 3344,
+      "hex": "0xD10"
+    },
+    "m_iBaseDamageMin": {
+      "offset": 3348,
+      "hex": "0xD14"
+    },
+    "m_iBaseDamageMax": {
+      "offset": 3352,
+      "hex": "0xD18"
+    },
+    "m_ModifierManager": {
+      "offset": 3360,
+      "hex": "0xD20"
+    },
+    "m_Inventory": {
+      "offset": 4248,
+      "hex": "0x1098"
+    },
+    "m_nUnitState64": {
+      "offset": 4496,
+      "hex": "0x1190"
+    },
+    "m_nUnitDebuffState": {
+      "offset": 4512,
+      "hex": "0x11A0"
+    },
+    "m_bHasInventory": {
+      "offset": 4520,
+      "hex": "0x11A8"
+    },
+    "m_iAcquisitionRange": {
+      "offset": 4524,
+      "hex": "0x11AC"
+    },
+    "m_FoWViewID": {
+      "offset": 4528,
+      "hex": "0x11B0"
+    },
+    "m_iTeamViewerID": {
+      "offset": 4532,
+      "hex": "0x11B4"
+    },
+    "m_iPrevHealthPct": {
+      "offset": 4536,
+      "hex": "0x11B8"
+    },
+    "m_iPrevLifeState": {
+      "offset": 4540,
+      "hex": "0x11BC"
+    },
+    "m_iPrevTeam": {
+      "offset": 4544,
+      "hex": "0x11C0"
+    },
+    "m_bLastShardState": {
+      "offset": 4548,
+      "hex": "0x11C4"
+    },
+    "m_bLastScepterState": {
+      "offset": 4549,
+      "hex": "0x11C5"
+    },
+    "m_bForceScepterState": {
+      "offset": 4550,
+      "hex": "0x11C6"
+    },
+    "m_bForceShardState": {
+      "offset": 4551,
+      "hex": "0x11C7"
+    },
+    "m_bPrevProvidesVision": {
+      "offset": 4552,
+      "hex": "0x11C8"
+    },
+    "m_nPrevControllableMask": {
+      "offset": 4560,
+      "hex": "0x11D0"
+    },
+    "m_TagTime": {
+      "offset": 4576,
+      "hex": "0x11E0"
+    },
+    "m_ClickedTime": {
+      "offset": 4600,
+      "hex": "0x11F8"
+    },
+    "m_flIdleRunPoseStartTime": {
+      "offset": 4624,
+      "hex": "0x1210"
+    },
+    "m_flIdleRunPoseDuration": {
+      "offset": 4632,
+      "hex": "0x1218"
+    },
+    "m_bAnimationTransitionActive": {
+      "offset": 4640,
+      "hex": "0x1220"
+    },
+    "m_nAnimationTransitionPoseParameters": {
+      "offset": 4644,
+      "hex": "0x1224"
+    },
+    "m_nAnimationTransitionInjuredPoseParameters": {
+      "offset": 4652,
+      "hex": "0x122C"
+    },
+    "m_nAnimationTransitionAggressivePoseParameters": {
+      "offset": 4660,
+      "hex": "0x1234"
+    },
+    "m_flTimeSinceLastAbilityNag": {
+      "offset": 4744,
+      "hex": "0x1288"
+    },
+    "m_iAttackCapabilities": {
+      "offset": 4748,
+      "hex": "0x128C"
+    },
+    "m_iSpecialAbility": {
+      "offset": 4752,
+      "hex": "0x1290"
+    },
+    "m_iMoveCapabilities": {
+      "offset": 4756,
+      "hex": "0x1294"
+    },
+    "m_nPlayerOwnerID": {
+      "offset": 4760,
+      "hex": "0x1298"
+    },
+    "m_flLastDamageTime": {
+      "offset": 4764,
+      "hex": "0x129C"
+    },
+    "m_flLastAttackTime": {
+      "offset": 4768,
+      "hex": "0x12A0"
+    },
+    "m_iszMinimapIcon": {
+      "offset": 4776,
+      "hex": "0x12A8"
+    },
+    "m_flMinimapIconSize": {
+      "offset": 4792,
+      "hex": "0x12B8"
+    },
+    "m_bMinimapDisableTint": {
+      "offset": 4796,
+      "hex": "0x12BC"
+    },
+    "m_bMinimapDisableRotation": {
+      "offset": 4797,
+      "hex": "0x12BD"
+    },
+    "m_colorHeroGlow": {
+      "offset": 4798,
+      "hex": "0x12BE"
+    },
+    "m_iNearShopMask": {
+      "offset": 4804,
+      "hex": "0x12C4"
+    },
+    "m_nPoseParameterTurn": {
+      "offset": 4808,
+      "hex": "0x12C8"
+    },
+    "m_nPoseParameterRun": {
+      "offset": 4812,
+      "hex": "0x12CC"
+    },
+    "m_flLean": {
+      "offset": 4816,
+      "hex": "0x12D0"
+    },
+    "m_flRun": {
+      "offset": 4820,
+      "hex": "0x12D4"
+    },
+    "m_anglediff": {
+      "offset": 4824,
+      "hex": "0x12D8"
+    },
+    "m_bInfoKeyActive": {
+      "offset": 4828,
+      "hex": "0x12DC"
+    },
+    "m_bNewUpdateAssetModifiersNetworked": {
+      "offset": 4829,
+      "hex": "0x12DD"
+    },
+    "m_nAssetModifiersLastUpdatedTick": {
+      "offset": 4832,
+      "hex": "0x12E0"
+    },
+    "m_bSuppressGlow": {
+      "offset": 4836,
+      "hex": "0x12E4"
+    },
+    "m_bWasSinking": {
+      "offset": 4837,
+      "hex": "0x12E5"
+    },
+    "m_flRangeDisplayDist": {
+      "offset": 4840,
+      "hex": "0x12E8"
+    },
+    "m_szDefaultIdle": {
+      "offset": 5328,
+      "hex": "0x14D0"
+    },
+    "m_szDefaultRareIdle": {
+      "offset": 5336,
+      "hex": "0x14D8"
+    },
+    "m_damagetimer": {
+      "offset": 5344,
+      "hex": "0x14E0"
+    },
+    "m_vRenderOrigin": {
+      "offset": 5368,
+      "hex": "0x14F8"
+    },
+    "m_fZDelta": {
+      "offset": 5380,
+      "hex": "0x1504"
+    },
+    "m_flDeathTime": {
+      "offset": 5384,
+      "hex": "0x1508"
+    },
+    "m_bBaseStatsChanged": {
+      "offset": 5388,
+      "hex": "0x150C"
+    },
+    "m_bNeedsSoundEmitterRefresh": {
+      "offset": 5389,
+      "hex": "0x150D"
+    },
+    "m_flPhysicalArmorValue": {
+      "offset": 5392,
+      "hex": "0x1510"
+    },
+    "m_flMagicalResistanceValue": {
+      "offset": 5396,
+      "hex": "0x1514"
+    },
+    "m_nPrevSequenceParity": {
+      "offset": 5400,
+      "hex": "0x1518"
+    },
+    "m_flPrevInvisLevel": {
+      "offset": 5568,
+      "hex": "0x15C0"
+    },
+    "m_nOriginalModelIndex": {
+      "offset": 5576,
+      "hex": "0x15C8"
+    },
+    "m_nClientOriginalModelIndex": {
+      "offset": 5584,
+      "hex": "0x15D0"
+    },
+    "m_nClientReplacementModelIndex": {
+      "offset": 5592,
+      "hex": "0x15D8"
+    },
+    "m_bClientReplacementModelNeedsRebuild": {
+      "offset": 5600,
+      "hex": "0x15E0"
+    },
+    "m_nClientReplacementModelReloadCount": {
+      "offset": 5604,
+      "hex": "0x15E4"
+    },
+    "m_nUnitModelVariant": {
+      "offset": 5608,
+      "hex": "0x15E8"
+    },
+    "m_nUnitModelVariantCount": {
+      "offset": 5609,
+      "hex": "0x15E9"
+    },
+    "m_iPrevSequence": {
+      "offset": 5612,
+      "hex": "0x15EC"
+    },
+    "m_pLastWeatherEffectName": {
+      "offset": 5616,
+      "hex": "0x15F0"
+    },
+    "m_VoiceBackgroundSoundTimer": {
+      "offset": 5632,
+      "hex": "0x1600"
+    },
+    "m_bIsWaitingToSpawn": {
+      "offset": 5656,
+      "hex": "0x1618"
+    },
+    "m_nTotalDamageTaken": {
+      "offset": 5664,
+      "hex": "0x1620"
+    },
+    "m_flManaRegen": {
+      "offset": 5672,
+      "hex": "0x1628"
+    },
+    "m_flHealthRegen": {
+      "offset": 5676,
+      "hex": "0x162C"
+    },
+    "m_bIsMoving": {
+      "offset": 5680,
+      "hex": "0x1630"
+    },
+    "m_fRevealRadius": {
+      "offset": 5684,
+      "hex": "0x1634"
+    },
+    "m_bCanUseWards": {
+      "offset": 5688,
+      "hex": "0x1638"
+    },
+    "m_bCanUseAllItems": {
+      "offset": 5689,
+      "hex": "0x1639"
+    },
+    "m_iXPBounty": {
+      "offset": 5692,
+      "hex": "0x163C"
+    },
+    "m_iXPBountyExtra": {
+      "offset": 5696,
+      "hex": "0x1640"
+    },
+    "m_iGoldBountyMin": {
+      "offset": 5700,
+      "hex": "0x1644"
+    },
+    "m_iGoldBountyMax": {
+      "offset": 5704,
+      "hex": "0x1648"
+    },
+    "m_hOwnerNPC": {
+      "offset": 5708,
+      "hex": "0x164C"
+    },
+    "m_hGoalEntity": {
+      "offset": 5712,
+      "hex": "0x1650"
+    },
+    "m_hNeutralSpawner": {
+      "offset": 5716,
+      "hex": "0x1654"
+    },
+    "m_hClientOverrideMaterial": {
+      "offset": 5720,
+      "hex": "0x1658"
+    },
+    "m_bCombinerMaterialOverrideListChanged": {
+      "offset": 5728,
+      "hex": "0x1660"
+    },
+    "m_nBaseModelMeshCount": {
+      "offset": 5732,
+      "hex": "0x1664"
+    },
+    "m_combinerMaterialOverrideList": {
+      "offset": 5736,
+      "hex": "0x1668"
+    },
+    "m_nArcanaLevel": {
+      "offset": 5760,
+      "hex": "0x1680"
+    },
+    "m_nDefaultArcanaLevel": {
+      "offset": 5761,
+      "hex": "0x1681"
+    },
+    "m_defaultColorGemColor": {
+      "offset": 5762,
+      "hex": "0x1682"
+    },
+    "m_bHasBuiltWearableSpawnList": {
+      "offset": 5792,
+      "hex": "0x16A0"
+    },
+    "m_bHasCostume": {
+      "offset": 5793,
+      "hex": "0x16A1"
+    },
+    "m_bRecreateParticleSystemsOnModifiersChange": {
+      "offset": 5794,
+      "hex": "0x16A2"
+    },
+    "m_bWasRevealedFromFOWAsDead": {
+      "offset": 5795,
+      "hex": "0x16A3"
+    },
+    "m_flAdditionalSinkDelay": {
+      "offset": 5820,
+      "hex": "0x16BC"
+    },
+    "m_nScepterUpgradeID": {
+      "offset": 5864,
+      "hex": "0x16E8"
+    },
+    "m_nShardUpgradeID": {
+      "offset": 5868,
+      "hex": "0x16EC"
+    },
+    "m_NetworkActivity": {
+      "offset": 6096,
+      "hex": "0x17D0"
+    },
+    "m_PrevNetworkActivity": {
+      "offset": 6100,
+      "hex": "0x17D4"
+    },
+    "m_NetworkSequenceIndex": {
+      "offset": 6104,
+      "hex": "0x17D8"
+    },
+    "m_bShouldDoFlyHeightVisual": {
+      "offset": 6108,
+      "hex": "0x17DC"
+    },
+    "m_flStartSequenceCycle": {
+      "offset": 6112,
+      "hex": "0x17E0"
+    },
+    "m_ActivityModifiers": {
+      "offset": 6120,
+      "hex": "0x17E8"
+    },
+    "m_hBackgroundSceneEnt": {
+      "offset": 6144,
+      "hex": "0x1800"
+    },
+    "m_hSpeakingSceneEnt": {
+      "offset": 6148,
+      "hex": "0x1804"
+    },
+    "m_hOldWearables": {
+      "offset": 6168,
+      "hex": "0x1818"
+    },
+    "m_hOldWearableSkins": {
+      "offset": 6192,
+      "hex": "0x1830"
+    },
+    "m_CustomHealthLabel": {
+      "offset": 6216,
+      "hex": "0x1848"
+    },
+    "m_CustomHealthLabelColor": {
+      "offset": 6472,
+      "hex": "0x1948"
+    },
+    "m_nWearableDefIndex": {
+      "offset": 6476,
+      "hex": "0x194C"
+    },
+    "m_gibTintColor": {
+      "offset": 6481,
+      "hex": "0x1951"
+    },
+    "m_bForceMaterialCombine": {
+      "offset": 6485,
+      "hex": "0x1955"
+    },
+    "m_bShouldDrawParticlesWhileHidden": {
+      "offset": 6486,
+      "hex": "0x1956"
+    },
+    "m_bIsClientThinkPending": {
+      "offset": 6487,
+      "hex": "0x1957"
+    },
+    "m_bActivityModifiersDirty": {
+      "offset": 6488,
+      "hex": "0x1958"
+    },
+    "m_bUnitModelVariantChanged": {
+      "offset": 6489,
+      "hex": "0x1959"
+    },
+    "m_bWearablesAreTaunting": {
+      "offset": 6490,
+      "hex": "0x195A"
+    },
+    "m_bWearablesLoadoutOverride": {
+      "offset": 6491,
+      "hex": "0x195B"
+    },
+    "m_bShowCannotBeDisabledIcon": {
+      "offset": 6512,
+      "hex": "0x1970"
+    },
+    "m_nVisionPreviewViewer": {
+      "offset": 6544,
+      "hex": "0x1990"
+    }
+  },
+  "C_DOTAPlayerController": {
+    "m_iMinimapMove": {
+      "offset": 2200,
+      "hex": "0x898"
+    },
+    "m_pClickBehaviorKeys": {
+      "offset": 2208,
+      "hex": "0x8A0"
+    },
+    "m_flCenterTime": {
+      "offset": 2216,
+      "hex": "0x8A8"
+    },
+    "m_iConfirmationIndex": {
+      "offset": 2220,
+      "hex": "0x8AC"
+    },
+    "m_bCenterOnHero": {
+      "offset": 2224,
+      "hex": "0x8B0"
+    },
+    "m_bHeroAssigned": {
+      "offset": 2225,
+      "hex": "0x8B1"
+    },
+    "m_nKeyBindHeroID": {
+      "offset": 2228,
+      "hex": "0x8B4"
+    },
+    "m_bUsingCameraMan": {
+      "offset": 2232,
+      "hex": "0x8B8"
+    },
+    "m_bUsingAssistedCameraOperator": {
+      "offset": 2233,
+      "hex": "0x8B9"
+    },
+    "m_nPlayerAssistFlags": {
+      "offset": 2236,
+      "hex": "0x8BC"
+    },
+    "m_vLatestEvent": {
+      "offset": 2240,
+      "hex": "0x8C0"
+    },
+    "m_hFreeDrawAbility": {
+      "offset": 2288,
+      "hex": "0x8F0"
+    },
+    "m_vLastFreeDrawPosition": {
+      "offset": 2292,
+      "hex": "0x8F4"
+    },
+    "m_nPlayerID": {
+      "offset": 2304,
+      "hex": "0x900"
+    },
+    "m_hAssignedHero": {
+      "offset": 2308,
+      "hex": "0x904"
+    },
+    "m_hLastAssignedHero": {
+      "offset": 2312,
+      "hex": "0x908"
+    },
+    "m_hKillCamUnit": {
+      "offset": 2316,
+      "hex": "0x90C"
+    },
+    "m_hPreviousKillCamUnit": {
+      "offset": 2320,
+      "hex": "0x910"
+    },
+    "m_flKillCamUnitReceivedTime": {
+      "offset": 2324,
+      "hex": "0x914"
+    },
+    "m_nRareLineClickCount": {
+      "offset": 2336,
+      "hex": "0x920"
+    },
+    "m_nRareLinesPlayed": {
+      "offset": 2340,
+      "hex": "0x924"
+    },
+    "m_nRareLineGroup": {
+      "offset": 2344,
+      "hex": "0x928"
+    },
+    "m_flLastRareLinePlayTime": {
+      "offset": 2348,
+      "hex": "0x92C"
+    },
+    "m_flUnitOrdersSendTime": {
+      "offset": 2352,
+      "hex": "0x930"
+    },
+    "m_flLastUnitOrdersSendTime": {
+      "offset": 2356,
+      "hex": "0x934"
+    },
+    "m_flLastUnitOrdersTotalLatency": {
+      "offset": 2360,
+      "hex": "0x938"
+    },
+    "m_flLastPingTime": {
+      "offset": 2364,
+      "hex": "0x93C"
+    },
+    "m_flPingAllowance": {
+      "offset": 2368,
+      "hex": "0x940"
+    },
+    "m_bTeleportRequiresHalt": {
+      "offset": 2372,
+      "hex": "0x944"
+    },
+    "m_bChannelRequiresHalt": {
+      "offset": 2373,
+      "hex": "0x945"
+    },
+    "m_bInteractionChannelsRequireHalt": {
+      "offset": 2374,
+      "hex": "0x946"
+    },
+    "m_bAutoPurchaseItems": {
+      "offset": 2375,
+      "hex": "0x947"
+    },
+    "m_bDisableHUDErrorMessages": {
+      "offset": 2376,
+      "hex": "0x948"
+    },
+    "m_flMouseDragStartX": {
+      "offset": 2380,
+      "hex": "0x94C"
+    },
+    "m_flMouseDragStartY": {
+      "offset": 2384,
+      "hex": "0x950"
+    },
+    "m_nWeatherType": {
+      "offset": 2388,
+      "hex": "0x954"
+    },
+    "m_bDynamicWeatherSystemActive": {
+      "offset": 2392,
+      "hex": "0x958"
+    },
+    "m_bDynamicSoundHandled": {
+      "offset": 2393,
+      "hex": "0x959"
+    },
+    "m_flDynamicWeatherNextSwitchTime": {
+      "offset": 2396,
+      "hex": "0x95C"
+    },
+    "m_flDynamicWeatherScaleFinishedTime": {
+      "offset": 2400,
+      "hex": "0x960"
+    },
+    "m_flDynamicWeatherIntensity": {
+      "offset": 2404,
+      "hex": "0x964"
+    },
+    "m_nXPRangeFXIndex": {
+      "offset": 2408,
+      "hex": "0x968"
+    },
+    "m_nVisionRangeFXIndex": {
+      "offset": 2412,
+      "hex": "0x96C"
+    },
+    "m_hRangeHintAbility": {
+      "offset": 2420,
+      "hex": "0x974"
+    },
+    "m_nRangeHintFXIndex": {
+      "offset": 2424,
+      "hex": "0x978"
+    },
+    "m_flRangeHintFXLastRadius": {
+      "offset": 2428,
+      "hex": "0x97C"
+    },
+    "m_nSelectedControlGroup": {
+      "offset": 2432,
+      "hex": "0x980"
+    },
+    "m_nCachedCoachedTeam": {
+      "offset": 2436,
+      "hex": "0x984"
+    },
+    "m_flLastReportedMissedSnapshotRate": {
+      "offset": 2440,
+      "hex": "0x988"
+    },
+    "m_hActiveAbility": {
+      "offset": 2444,
+      "hex": "0x98C"
+    },
+    "m_unitorders": {
+      "offset": 2448,
+      "hex": "0x990"
+    },
+    "m_nNextOutgoingOrderSequenceNumber": {
+      "offset": 2472,
+      "hex": "0x9A8"
+    },
+    "m_nServerOrderSequenceNumber": {
+      "offset": 2476,
+      "hex": "0x9AC"
+    },
+    "m_nMaxSentOutgoingOrderSequenceNumber": {
+      "offset": 2480,
+      "hex": "0x9B0"
+    },
+    "m_nSelectedUnits": {
+      "offset": 2488,
+      "hex": "0x9B8"
+    },
+    "m_nWaypoints": {
+      "offset": 2512,
+      "hex": "0x9D0"
+    },
+    "m_iActions": {
+      "offset": 2536,
+      "hex": "0x9E8"
+    },
+    "m_hQueryUnit": {
+      "offset": 2540,
+      "hex": "0x9EC"
+    },
+    "m_bInQuery": {
+      "offset": 2544,
+      "hex": "0x9F0"
+    },
+    "m_bSelectionChangedInDataUpdate": {
+      "offset": 2545,
+      "hex": "0x9F1"
+    },
+    "m_flQueryInhibitingActionTime": {
+      "offset": 2648,
+      "hex": "0xA58"
+    },
+    "m_flQueryInhibitDuration": {
+      "offset": 2652,
+      "hex": "0xA5C"
+    },
+    "m_RingedEntities": {
+      "offset": 2656,
+      "hex": "0xA60"
+    },
+    "m_ActiveRingOwners": {
+      "offset": 2680,
+      "hex": "0xA78"
+    },
+    "m_bOverridingQuery": {
+      "offset": 2704,
+      "hex": "0xA90"
+    },
+    "m_flLastAutoRepeatTime": {
+      "offset": 2712,
+      "hex": "0xA98"
+    },
+    "m_bNextDoubleclickIsOnlyAClick": {
+      "offset": 2716,
+      "hex": "0xA9C"
+    },
+    "m_flConsumeDoubleclickTime": {
+      "offset": 2720,
+      "hex": "0xAA0"
+    },
+    "m_LightInfoWeatherEffect": {
+      "offset": 2728,
+      "hex": "0xAA8"
+    },
+    "m_bPreviousWasLightInfoWeather": {
+      "offset": 2736,
+      "hex": "0xAB0"
+    },
+    "m_MapDefaultWeatherEffect": {
+      "offset": 2744,
+      "hex": "0xAB8"
+    },
+    "m_bMapUsesDynamicWeather": {
+      "offset": 2752,
+      "hex": "0xAC0"
+    },
+    "m_nCastRangeEffectCreationRadius": {
+      "offset": 2792,
+      "hex": "0xAE8"
+    },
+    "m_vecSuggestedWardLocationEffects": {
+      "offset": 2824,
+      "hex": "0xB08"
+    },
+    "m_hSmartCastNPC": {
+      "offset": 2848,
+      "hex": "0xB20"
+    },
+    "m_nTeamSprayParticleIndex": {
+      "offset": 2852,
+      "hex": "0xB24"
+    },
+    "m_nScanCastIndicatorParticleIndex": {
+      "offset": 2856,
+      "hex": "0xB28"
+    },
+    "m_bIsNextCastOrderFromMouseClick": {
+      "offset": 2860,
+      "hex": "0xB2C"
+    },
+    "m_bIsSelectHeroHeld": {
+      "offset": 2944,
+      "hex": "0xB80"
+    },
+    "m_flSelectHeroHeldStartTime": {
+      "offset": 2952,
+      "hex": "0xB88"
+    },
+    "m_fLastNetworkStatsSent": {
+      "offset": 2960,
+      "hex": "0xB90"
+    },
+    "m_iCursor": {
+      "offset": 2968,
+      "hex": "0xB98"
+    },
+    "m_iSpectatorClickBehavior": {
+      "offset": 2976,
+      "hex": "0xBA0"
+    },
+    "m_flAspectRatio": {
+      "offset": 2980,
+      "hex": "0xBA4"
+    },
+    "m_hSpectatorQueryUnit": {
+      "offset": 2984,
+      "hex": "0xBA8"
+    },
+    "m_iStatsPanel": {
+      "offset": 2988,
+      "hex": "0xBAC"
+    },
+    "m_iShopPanel": {
+      "offset": 2992,
+      "hex": "0xBB0"
+    },
+    "m_iShopViewMode": {
+      "offset": 2996,
+      "hex": "0xBB4"
+    },
+    "m_iStatsDropdownCategory": {
+      "offset": 3000,
+      "hex": "0xBB8"
+    },
+    "m_iStatsDropdownSort": {
+      "offset": 3004,
+      "hex": "0xBBC"
+    },
+    "m_szShopString": {
+      "offset": 3008,
+      "hex": "0xBC0"
+    },
+    "m_vecClientQuickBuyState": {
+      "offset": 3072,
+      "hex": "0xC00"
+    },
+    "m_bInShowCaseMode": {
+      "offset": 3176,
+      "hex": "0xC68"
+    },
+    "m_flCameraZoomAmount": {
+      "offset": 3180,
+      "hex": "0xC6C"
+    },
+    "m_iHighPriorityScore": {
+      "offset": 3184,
+      "hex": "0xC70"
+    },
+    "m_flUnfilteredFrameTime": {
+      "offset": 3188,
+      "hex": "0xC74"
+    },
+    "m_NeutralCampAlarms": {
+      "offset": 3192,
+      "hex": "0xC78"
+    },
+    "m_iPrevCursor": {
+      "offset": 3216,
+      "hex": "0xC90"
+    },
+    "m_iPositionHistoryTail": {
+      "offset": 3384,
+      "hex": "0xD38"
+    },
+    "m_iMusicStatus": {
+      "offset": 3388,
+      "hex": "0xD3C"
+    },
+    "m_iPreviousMusicStatus": {
+      "offset": 3392,
+      "hex": "0xD40"
+    },
+    "m_bRequestedInventory": {
+      "offset": 3396,
+      "hex": "0xD44"
+    },
+    "m_flMusicOperatorVals": {
+      "offset": 3400,
+      "hex": "0xD48"
+    },
+    "m_iMusicOperatorVals": {
+      "offset": 3412,
+      "hex": "0xD54"
+    },
+    "m_ControlGroups": {
+      "offset": 3432,
+      "hex": "0xD68"
+    },
+    "m_pkvControlGroupKV": {
+      "offset": 3672,
+      "hex": "0xE58"
+    },
+    "m_flAltHeldStartTime": {
+      "offset": 3768,
+      "hex": "0xEB8"
+    }
+  },
+  "C_BaseEntity": {
+    "m_pGameSceneNode": {
+      "offset": 824,
+      "hex": "0x338"
+    },
+    "m_iHealth": {
+      "offset": 852,
+      "hex": "0x354"
+    },
+    "m_iMaxHealth": {
+      "offset": 848,
+      "hex": "0x350"
+    },
+    "m_lifeState": {
+      "offset": 856,
+      "hex": "0x358"
+    },
+    "m_iTeamNum": {
+      "offset": 1011,
+      "hex": "0x3F3"
+    }
+  },
+  "C_DOTABaseAbility": {
+    "m_iLevel": {
+      "offset": 1576,
+      "hex": "0x628"
+    },
+    "m_fCooldown": {
+      "offset": 1592,
+      "hex": "0x638"
+    },
+    "m_flCooldownLength": {
+      "offset": 1596,
+      "hex": "0x63C"
+    },
+    "m_iManaCost": {
+      "offset": 1600,
+      "hex": "0x640"
+    },
+    "m_bHidden": {
+      "offset": 1559,
+      "hex": "0x617"
+    },
+    "m_bActivated": {
+      "offset": 1561,
+      "hex": "0x619"
+    },
+    "m_bToggleState": {
+      "offset": 1581,
+      "hex": "0x62D"
+    },
+    "m_bAutoCastState": {
+      "offset": 1604,
+      "hex": "0x644"
+    },
+    "m_nAbilityCurrentCharges": {
+      "offset": 1632,
+      "hex": "0x660"
+    },
+    "m_fAbilityChargeRestoreTimeRemaining": {
+      "offset": 1636,
+      "hex": "0x664"
+    }
+  },
+  "CGameSceneNode": {
+    "m_vecAbsOrigin": {
+      "offset": 208,
+      "hex": "0xD0"
+    }
+  },
+  "CDOTAGamerules": {
+    "m_bGamePaused": {
+      "offset": 56,
+      "hex": "0x38"
+    },
+    "m_nServerGameState": {
+      "offset": 116,
+      "hex": "0x74"
+    },
+    "m_nGameState": {
+      "offset": 124,
+      "hex": "0x7C"
+    },
+    "m_nGameMode": {
+      "offset": 228,
+      "hex": "0xE4"
+    },
+    "m_flGameTime": {
+      "offset": 48,
+      "hex": "0x30"
+    },
+    "m_flGameStartTime": {
+      "offset": 52,
+      "hex": "0x34"
+    }
+  },
+  "C_DOTAGamerulesProxy": {
+    "m_pGameRules": {
+      "offset": 1528,
+      "hex": "0x5F8"
+    }
+  }
+}

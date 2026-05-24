@@ -1,0 +1,14 @@
+// Encrypted resources embedded into DotaFarm.exe.
+// Generated/refreshed by CMake pre-build: scripts/encrypt_resource.py reads
+// the source files and produces build/embedded/*_encrypted.bin, which RC
+// then embeds as RT_RCDATA. payload_loader::LoadEmbeddedResource() decrypts
+// at runtime.
+//
+// Magic vocabulary (matches payload_loader.h):
+//   DFDL — DLLs (Andromeda, ProxyHook)             — manual map, no disk
+//   DFSP — Spoofer family (spoofer.sys, kdu.exe)   — disk-stage, exec/load
+
+ANDROMEDA_DLL  RCDATA  "embedded/andromeda_encrypted.bin"
+PROXYHOOK_DLL  RCDATA  "embedded/proxyhook_encrypted.bin"
+SPOOFER_SYS    RCDATA  "embedded/spoofer_encrypted.bin"
+KDU_EXE        RCDATA  "embedded/kdu_encrypted.bin"
