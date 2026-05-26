@@ -7,6 +7,11 @@
 #include <vector>
 #include <cstdint>
 
+// Forward decl — реальная definition в pair_code.h (Task T1).
+// Используется только в API config::ApplyPairCode (по reference), поэтому
+// header-include здесь не нужен — реализация в config.cpp включит pair_code.h.
+namespace pair_code { struct Decoded; }
+
 // Spoof Mode — единый селектор HWID-режима для фермы.
 // Off       — никакого спуфа, легитимный HWID
 // SteamOnly — per-process IAT хуки через ProxyHook.dll. Каждый Steam инстанс
@@ -211,6 +216,11 @@ struct FarmConfig
 		int         matchSyncTimeoutS     = 15;
 		int         maxConsecutiveCancels = 3;
 		int         postGameWinnerGraceS  = 60;
+
+		// Opt-in для нового UX (Pair Code workflow + Sync Start). При true GUI
+		// показывает упрощённый pair-code flow вместо ручного редактирования
+		// relay/user/pair полей. Default false — старый UX по-прежнему доступен.
+		bool        uxV2                  = false;
 	};
 	PairingConfig pairing;
 
@@ -267,6 +277,21 @@ bool SaveFarmStringSetting( const std::string& path, const std::string& key, con
 
 // Аналог для int-полей (например cores_per_instance). Семантика идентична.
 bool SaveFarmIntSetting( const std::string& path, const std::string& key, int value );
+
+// Atomic RMW write секции "pairing" в farm.json.
+// Использует LockFileEx + MoveFileEx (паттерн strategy_writer). Сохраняет
+// все НЕ-pairing секции (heroes, accounts, crash_recovery, minifier, и т.п.).
+// Сериализуется JSON с indent=4 (читабельно для пользователя).
+bool SavePairingConfigAtomic( const std::string& farmJsonPath,
+                              const FarmConfig::PairingConfig& cfg );
+
+// Применяет decoded pair code к существующему PairingConfig.
+// Merge: relayHost, relayPort, userId, userAuthToken, pairId, pairSecret,
+// role (на основе roleHint), transport="relay".
+// Preserve: enabled, masterIp, ipcPort, matchSyncTimeoutS,
+// maxConsecutiveCancels, postGameWinnerGraceS, uxV2.
+// roleHint == "M" → role="master", иначе → role="slave".
+void ApplyPairCode( const pair_code::Decoded& src, FarmConfig::PairingConfig& dst );
 
 // Нормализует проксю в канонический socks5://user:pass@host:port формат.
 // Принимает:

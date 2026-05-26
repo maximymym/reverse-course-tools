@@ -1,10 +1,12 @@
 #include "config.h"
 #include "crypto/sealed_file.h"
+#include "pair_code.h"
 #include <json.hpp>
 #include <fstream>
 #include <sstream>
 #include <cctype>
 #include <algorithm>
+#include <Windows.h>
 
 using json = nlohmann::json;
 
@@ -291,6 +293,7 @@ bool LoadFarmSettings( const std::string& path, FarmConfig& cfg )
 			if ( pr.contains( "match_sync_timeout_s" ) )     dst.matchSyncTimeoutS = pr["match_sync_timeout_s"].get<int>();
 			if ( pr.contains( "max_consecutive_cancels" ) )  dst.maxConsecutiveCancels = pr["max_consecutive_cancels"].get<int>();
 			if ( pr.contains( "post_game_winner_grace_s" ) ) dst.postGameWinnerGraceS = pr["post_game_winner_grace_s"].get<int>();
+			if ( pr.contains( "uxV2" ) )                     dst.uxV2 = pr["uxV2"].get<bool>();
 		}
 
 		if ( j.contains( "team_strategy_mode" ) && j["team_strategy_mode"].is_string() )
@@ -512,6 +515,148 @@ bool SaveFarmIntSetting( const std::string& path, const std::string& key, int va
 	if ( !out.is_open() ) return false;
 	out << j.dump( 4 );
 	return true;
+}
+
+// ── Atomic RMW helpers (паттерн из strategy_writer.cpp) ──────────────
+// LockFileEx над выделенным lock-файлом рядом с farm.json. Сам JSON
+// заменяется через MoveFileExA → лочить его handle бесполезно, поэтому
+// держим отдельный <path>.lock.
+namespace
+{
+
+class FileLock
+{
+public:
+	FileLock( const std::string& path )
+	{
+		m_h = CreateFileA( path.c_str(), GENERIC_READ | GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL, nullptr );
+		if ( m_h == INVALID_HANDLE_VALUE ) return;
+
+		OVERLAPPED ovl{};
+		if ( !LockFileEx( m_h, LOCKFILE_EXCLUSIVE_LOCK, 0,
+				MAXDWORD, MAXDWORD, &ovl ) )
+		{
+			CloseHandle( m_h );
+			m_h = INVALID_HANDLE_VALUE;
+		}
+	}
+
+	~FileLock()
+	{
+		if ( m_h != INVALID_HANDLE_VALUE )
+		{
+			OVERLAPPED ovl{};
+			UnlockFileEx( m_h, 0, MAXDWORD, MAXDWORD, &ovl );
+			CloseHandle( m_h );
+		}
+	}
+
+	bool ok() const { return m_h != INVALID_HANDLE_VALUE; }
+
+	FileLock( const FileLock& ) = delete;
+	FileLock& operator=( const FileLock& ) = delete;
+
+private:
+	HANDLE m_h = INVALID_HANDLE_VALUE;
+};
+
+static bool WriteAtomicFile( const std::string& finalPath,
+                             const std::string& tmpPath,
+                             const std::string& body )
+{
+	{
+		std::ofstream f( tmpPath, std::ios::binary | std::ios::trunc );
+		if ( !f ) return false;
+		f << body;
+		f.flush();
+		if ( !f ) return false;
+	}
+	if ( !MoveFileExA( tmpPath.c_str(), finalPath.c_str(),
+			MOVEFILE_REPLACE_EXISTING ) )
+	{
+		DeleteFileA( tmpPath.c_str() );
+		return false;
+	}
+	return true;
+}
+
+} // anonymous namespace
+
+bool SavePairingConfigAtomic( const std::string& farmJsonPath,
+                              const FarmConfig::PairingConfig& cfg )
+{
+	FileLock lk( farmJsonPath + ".lock" );
+	if ( !lk.ok() ) return false;
+
+	// RMW: читаем существующий farm.json в json, чтобы НЕ потерять прочие
+	// секции (heroes, accounts, crash_recovery, minifier и т.д.). Если файла
+	// нет — начинаем с пустого object'а.
+	json j = json::object();
+	{
+		std::ifstream in( farmJsonPath );
+		if ( in.is_open() )
+		{
+			try
+			{
+				in >> j;
+				if ( !j.is_object() ) j = json::object();
+			}
+			catch ( ... )
+			{
+				// Битый файл — отказываемся писать поверх, чтобы не уничтожить
+				// state юзера. Caller увидит false и может сделать backup/restore.
+				return false;
+			}
+		}
+	}
+
+	json& pr = j["pairing"];
+	pr["enabled"]                  = cfg.enabled;
+	pr["transport"]                = cfg.transport;
+	pr["role"]                     = cfg.role;
+	pr["user_id"]                  = cfg.userId;
+	pr["user_auth_token"]          = cfg.userAuthToken;
+	pr["pair_id"]                  = cfg.pairId;
+	pr["pair_secret"]              = cfg.pairSecret;
+	pr["master_ip"]                = cfg.masterIp;
+	pr["ipc_port"]                 = (int)cfg.ipcPort;
+	pr["relay_host"]               = cfg.relayHost;
+	pr["relay_port"]               = (int)cfg.relayPort;
+	pr["match_sync_timeout_s"]     = cfg.matchSyncTimeoutS;
+	pr["max_consecutive_cancels"]  = cfg.maxConsecutiveCancels;
+	pr["post_game_winner_grace_s"] = cfg.postGameWinnerGraceS;
+	pr["uxV2"]                     = cfg.uxV2;
+
+	std::string body;
+	try
+	{
+		body = j.dump( 4 );
+	}
+	catch ( ... )
+	{
+		return false;
+	}
+
+	return WriteAtomicFile( farmJsonPath, farmJsonPath + ".tmp", body );
+}
+
+void ApplyPairCode( const pair_code::Decoded& src,
+                    FarmConfig::PairingConfig& dst )
+{
+	dst.transport     = "relay";
+	dst.relayHost     = src.relayHost;
+	dst.relayPort     = src.relayPort;
+	dst.userId        = src.userId;
+	dst.userAuthToken = src.userAuthToken;
+	dst.pairId        = src.pairId;
+	dst.pairSecret    = src.pairSecret;
+	dst.role          = ( src.roleHint == "M" ) ? "master" : "slave";
+	// НЕ трогаем: enabled, masterIp, ipcPort, matchSyncTimeoutS,
+	//              maxConsecutiveCancels, postGameWinnerGraceS, uxV2.
+	// Caller (Orchestrator::ApplyPairCodeAndReinit) сам выставит
+	// enabled=true и uxV2=true.
 }
 
 std::vector<std::pair<std::string, VdfAccount>> ParseLoginUsersVdf( const std::string& steamDir )
