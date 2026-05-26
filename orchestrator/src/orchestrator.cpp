@@ -72,6 +72,27 @@ Orchestrator::Orchestrator()
 		m_bots[i].idx = i;
 }
 
+Orchestrator::~Orchestrator()
+{
+	// RelayPeer's m_onState lambda captures [this]. Если позволить unique_ptr
+	// разрушаться по умолчанию через member-destruction order, его dtor вызовет
+	// Stop() уже после того как часть members может быть в полу-разрушенном
+	// состоянии. Явный Stop() здесь форсирует join recv-thread (который и
+	// эмитит финальный SetState→Disconnected callback) ДО любых других member
+	// destructors — лямбда отработает на полностью валидном *this.
+	if ( m_relayPeer )
+	{
+		m_relayPeer->Stop();
+		m_relayPeer.reset();
+	}
+	if ( m_slavePeer )
+	{
+		m_slavePeer->Stop();
+		m_slavePeer.reset();
+	}
+	m_ipc.Stop();
+}
+
 // ── Path resolution ──
 
 std::string Orchestrator::ResolvePath( const std::string& path )
@@ -2991,7 +3012,21 @@ bool Orchestrator::ReinitPairing()
 {
 	if ( m_state == State::RUNNING )
 	{
-		Log( "[pairing] ReinitPairing refused: farm RUNNING" );
+		// UX cue: при auth_failed credentials в running peer'е "залипают" — без
+		// этого хинта юзер тыкает RECONNECT (бесполезно: backoff cycle на тех
+		// же протухших credentials) и не понимает что надо Stop Farm сначала.
+		std::string relayErr;
+		if ( m_relayPeer )
+			relayErr = m_relayPeer->LastRelayErrorCode();
+		if ( relayErr == "auth_failed" )
+		{
+			Log( "[pairing] ReinitPairing refused while RUNNING: stop farm first "
+				"to apply new Pair Code (current credentials rejected by relay: auth_failed)" );
+		}
+		else
+		{
+			Log( "[pairing] ReinitPairing refused: farm RUNNING — stop farm first to update pair credentials" );
+		}
 		return false;
 	}
 
@@ -3080,6 +3115,17 @@ bool Orchestrator::GuardedStartFarm()
 		return false;
 	}
 
+	// Re-verify socket survived TOCTOU window: GetPairingStatus был snapshot
+	// под no-lock, между ним и Initiate() relay мог отвалиться. Если broadcast
+	// уйдёт в /dev/null, пользователь увидит TIMEOUT только через 15s без root
+	// cause. Здесь narrow window до microseconds — Reset + return сразу.
+	if ( m_relayPeer && !m_relayPeer->IsConnected() )
+	{
+		m_syncStart.Reset( "socket_died_during_initiate" );
+		Log( "[pairing] GuardedStartFarm aborted: relay socket dropped during Initiate" );
+		return false;
+	}
+
 	Log( "[pairing] GuardedStartFarm initiated handshake (role=%s)",
 		m_config.pairing.role.c_str() );
 	return true;
@@ -3120,23 +3166,32 @@ void Orchestrator::RequestDisconnect()
 
 bool Orchestrator::ApplyPairCodeAndReinit( const pair_code::Decoded& decoded )
 {
-	// In-memory apply.
-	config::ApplyPairCode( decoded, m_config.pairing );
-	m_config.pairing.uxV2    = true;
-	m_config.pairing.enabled = true;
+	// Transactional: build new pairing config в temp, persist FIRST, и только
+	// после успешной atomic-записи на диск commit'им в m_config. Иначе при
+	// save fail (disk full / lock contention / corrupt farm.json) in-memory
+	// уже мутирован, файл — нет: расхождение до следующего рестарта, когда
+	// LoadFarmSettings снова прочитает старые credentials.
+	FarmConfig::PairingConfig newPairing = m_config.pairing;
+	config::ApplyPairCode( decoded, newPairing );
+	newPairing.uxV2    = true;
+	newPairing.enabled = true;
 
 	std::string path = m_config.configDir + "\\farm.json";
-	if ( !config::SavePairingConfigAtomic( path, m_config.pairing ) )
+	if ( !config::SavePairingConfigAtomic( path, newPairing ) )
 	{
-		Log( "[pairing] ApplyPairCodeAndReinit: SavePairingConfigAtomic FAILED (%s)",
+		Log( "[pairing] ApplyPairCodeAndReinit: SavePairingConfigAtomic FAILED (%s) "
+			"— in-memory pairing untouched",
 			path.c_str() );
 		return false;
 	}
 
+	// Save succeeded — теперь безопасно мутировать live config.
+	m_config.pairing = newPairing;
+
 	if ( !ReinitPairing() )
 	{
-		Log( "[pairing] ApplyPairCodeAndReinit: ReinitPairing FAILED "
-			"(config saved but transports not active)" );
+		Log( "[pairing] ApplyPairCodeAndReinit: file saved but ReinitPairing FAILED "
+			"(transport will retry on next ReinitPairing call)" );
 		return false;
 	}
 

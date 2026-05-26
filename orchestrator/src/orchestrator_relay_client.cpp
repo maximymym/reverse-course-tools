@@ -405,7 +405,22 @@ void RelayPeer::Send( const json& msg )
 	std::string line = ipc_proto::Sign( msg, m_secret );
 
 	std::lock_guard<std::mutex> lk( m_sendMx );
-	if ( m_sock == INVALID_SOCKET ) return;
+	if ( m_sock == INVALID_SOCKET )
+	{
+		// Surface dropped-socket sends в lastError, throttled чтобы не спамить
+		// (Send зовётся per heartbeat + per pairing/sync-start message). Без
+		// этого TOCTOU между connected-check и Send'ом виден только как
+		// 15-second "TIMEOUT" в GUI без root-cause в логе.
+		const int64_t nowMs = (int64_t)ipc_proto::NowMs();
+		const int64_t lastLog = m_lastDeadSendLogMs.load();
+		if ( nowMs - lastLog > 5000 )
+		{
+			m_lastDeadSendLogMs.store( nowMs );
+			std::lock_guard<std::mutex> elk( m_errMx );
+			m_lastError = "relay send dropped: socket already closed";
+		}
+		return;
+	}
 	int n = send( m_sock, line.data(), (int)line.size(), 0 );
 	if ( n == (int)line.size() )
 		m_msgSent.fetch_add( 1 );

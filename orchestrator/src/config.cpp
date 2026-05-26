@@ -573,9 +573,24 @@ static bool WriteAtomicFile( const std::string& finalPath,
 		f.flush();
 		if ( !f ) return false;
 	}
+	// Force write-back cache to disk before rename. Без этого на VM с writeback
+	// cache данные могут не дойти до сектора до того как MoveFileEx обновит
+	// журнал FS → power-loss даёт переименованный, но zero-length файл.
+	{
+		HANDLE h = CreateFileA( tmpPath.c_str(), GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+			OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr );
+		if ( h != INVALID_HANDLE_VALUE )
+		{
+			FlushFileBuffers( h );
+			CloseHandle( h );
+		}
+	}
 	if ( !MoveFileExA( tmpPath.c_str(), finalPath.c_str(),
 			MOVEFILE_REPLACE_EXISTING ) )
 	{
+		// Explicit cleanup: иначе orphan .tmp накапливается при sharing
+		// violation (AV-сканер локает) до следующего успешного save.
 		DeleteFileA( tmpPath.c_str() );
 		return false;
 	}

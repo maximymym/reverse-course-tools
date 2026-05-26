@@ -156,5 +156,9 @@ private:
 	// sleep вместо обычного exp backoff. После использования сбрасывается.
 	std::atomic<int>                m_authFailureBackoffMs{ 0 };
 
+	// Throttle для warn "socket already closed" в Send() — иначе heartbeat /
+	// pairing message каждые 3s заполнят error поле повторами.
+	std::atomic<int64_t>            m_lastDeadSendLogMs{ 0 };
+
 	bool                            m_wsaInited = false;
 };

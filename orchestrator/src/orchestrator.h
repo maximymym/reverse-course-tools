@@ -162,6 +162,7 @@ public:
 	};
 
 	Orchestrator();
+	~Orchestrator();
 
 	// Initialize with config, resolve all paths to absolute
 	bool Init( const std::string& configDir, const std::string& exeDir );

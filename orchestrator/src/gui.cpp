@@ -1911,6 +1911,20 @@ static void RenderSyncStartModal_( Orchestrator& orch )
 		if ( wasOpened )
 		{
 			wasOpened = false;  // coordinator advanced state → drop popup
+			// Закрыть popup явно: SyncStartCoordinator мог уйти из PEER_REQUESTED
+			// через timeout / Reset снаружи — ImGui сам popup не закроет, без
+			// CloseCurrentPopup останется висеть до first user click + даст
+			// assertion в EndFrame на debug build.
+			if ( ImGui::IsPopupOpen( "Peer Wants To Start Farming" ) )
+			{
+				if ( ImGui::BeginPopupModal( "Peer Wants To Start Farming",
+						nullptr,
+						ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove ) )
+				{
+					ImGui::CloseCurrentPopup();
+					ImGui::EndPopup();
+				}
+			}
 		}
 		return;
 	}
@@ -3899,6 +3913,17 @@ static void RenderDashboard( Orchestrator& orch )
 						orch.RequestForceReconnect();
 						orch.LogPublic( "Pairing: force reconnect requested" );
 					}
+				}
+				// При auth_failed + RUNNING reconnect зацикливается на старых
+				// credentials (юзер не может переписать pair code пока ферма
+				// активна). Tooltip объясняет что нужно сначала Stop Farm.
+				if ( ImGui::IsItemHovered() &&
+					ps.relayErrorCode == "auth_failed" &&
+					orch.GetState() == Orchestrator::State::RUNNING )
+				{
+					ImGui::SetTooltip( "Auth failed — relay отвергает credentials.\n"
+						"RECONNECT повторит цикл с теми же ключами.\n"
+						"Сначала остановите ферму (Stop Farm), затем Paste новый Pair Code." );
 				}
 				ImGui::SameLine();
 				const bool canDisconnect = ps.enabled && ps.connected;
