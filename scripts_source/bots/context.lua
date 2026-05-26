@@ -165,7 +165,38 @@ function M.Build(bot)
     -- cond_strategy_*: они работают по дистанции до lane_front.
     ctx.dLane = Dist2D(ctx.pos, ctx.lane_front)
     ctx.team_strategy   = (BotControllerConfig and BotControllerConfig.team_strategy) or "DEBOOST"
-    ctx.strategy_active = (gt or 0) >= ((BotControllerConfig and BotControllerConfig.strategy_enable_time) or 1800)
+    ctx.strategy_active = (gt or 0) >= ((BotControllerConfig and BotControllerConfig.strategy_enable_time) or 1200)
+
+    -- ── Two-stand scenario per-bot role derivation ────────────────
+    -- player_id из C++ binding (LuaUnitProxy::GetPlayerID, line 728 в LuaUnitProxy.cpp).
+    -- Один из 0..9 (radiant 0-4, dire 5-9). pid%5 даёт slot 0..4 внутри команды,
+    -- что детерминистично распределяет 5 ботов по METEOR_SQUAD (все на mid) /
+    -- SIDE_BAIT lanes (0,1 → top, 2,3 → bot, 4 → jungle).
+    do
+        local pid = -1
+        if bot.GetPlayerID then
+            local ok, p = pcall(function() return bot:GetPlayerID() end)
+            if ok and type(p) == "number" then pid = p end
+        end
+        ctx.player_id = pid
+        ctx.team_slot = (pid >= 0) and (pid % 5) or 0  -- 0..4 within team
+
+        -- SIDE_BAIT lane mapping (для LOSE):
+        --   slot 0,1 → top (lane 1)
+        --   slot 2,3 → bot (lane 3)
+        --   slot 4   → jungle (специальный маркер "J", handler пойдёт в safe jungle camp)
+        local slot = ctx.team_slot
+        if slot == 0 or slot == 1 then
+            ctx.side_bait_lane = 1  -- top
+            ctx.side_bait_kind = "lane"
+        elseif slot == 2 or slot == 3 then
+            ctx.side_bait_lane = 3  -- bot
+            ctx.side_bait_kind = "lane"
+        else
+            ctx.side_bait_lane = nil
+            ctx.side_bait_kind = "jungle"
+        end
+    end
 
     -- ── FSM-specific extensions ───────────────────────────────────
 

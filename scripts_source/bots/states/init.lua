@@ -12,12 +12,14 @@ local function safeRequire(name)
 end
 
 local handlers = {
-    [FSM.State.RESPAWN]     = safeRequire("states.respawn"),
-    [FSM.State.LANE_FARM]   = safeRequire("states.lane_farm"),
-    [FSM.State.LANE_WAIT]   = safeRequire("states.lane_wait"),
-    [FSM.State.JUNGLE_FARM] = safeRequire("states.jungle_farm"),
-    [FSM.State.PUSH]        = safeRequire("states.push"),
-    [FSM.State.RETREAT]     = safeRequire("states.retreat"),
+    [FSM.State.RESPAWN]      = safeRequire("states.respawn"),
+    [FSM.State.LANE_FARM]    = safeRequire("states.lane_farm"),
+    [FSM.State.LANE_WAIT]    = safeRequire("states.lane_wait"),
+    [FSM.State.JUNGLE_FARM]  = safeRequire("states.jungle_farm"),
+    [FSM.State.PUSH]         = safeRequire("states.push"),
+    [FSM.State.RETREAT]      = safeRequire("states.retreat"),
+    [FSM.State.METEOR_SQUAD] = safeRequire("states.meteor_squad"),
+    [FSM.State.SIDE_BAIT]    = safeRequire("states.side_bait"),
 }
 
 local count = 0

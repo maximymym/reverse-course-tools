@@ -14,13 +14,15 @@ local M = {}
 
 -- ── State enum ──────────────────────────────────────────────────
 M.State = {
-    DEAD        = 0,
-    RESPAWN     = 1,
-    LANE_FARM   = 2,
-    LANE_WAIT   = 3,
-    JUNGLE_FARM = 4,
-    PUSH        = 5,
-    RETREAT     = 6,
+    DEAD         = 0,
+    RESPAWN      = 1,
+    LANE_FARM    = 2,
+    LANE_WAIT    = 3,
+    JUNGLE_FARM  = 4,
+    PUSH         = 5,
+    RETREAT      = 6,
+    METEOR_SQUAD = 7,  -- WIN team @ strategy_enable_time: rally в mid, meteor cast (via util/items)
+    SIDE_BAIT    = 8,  -- LOSE team @ strategy_enable_time: расход по сайдам, mid avoidance
 }
 
 M.Name = {
@@ -31,6 +33,8 @@ M.Name = {
     [4] = "JUNGLE_FARM",
     [5] = "PUSH",
     [6] = "RETREAT",
+    [7] = "METEOR_SQUAD",
+    [8] = "SIDE_BAIT",
 }
 
 -- ── Helpers (локальные, чистые predicates) ──────────────────────
@@ -105,10 +109,12 @@ local function cond_pushable(bot, ctx)
     return ctx.pushable == true and MinTicksInState(ctx, 30)
 end
 
--- ── Team strategy: WIN forced push ─────────────────────────────
--- WIN-режим (после strategy_enable_time, обычно 30 мин): мгновенный PUSH
--- override, без обычного 30-tick gate. Условия: есть свои крипы + бот ≤800
--- от lane_front (т.е. реально на линии, не за фонтаном).
+-- ── Team strategy: WIN forced push (legacy fallback) ───────────
+-- WIN-режим: мгновенный PUSH override если бот уже на линии + есть крипы.
+-- ВАЖНО: cond_meteor_squad ниже приоритетнее — после strategy_enable_time
+-- 5 WIN-ботов идут в mid, а не push'ат свою random lane. cond_strategy_win_push
+-- остаётся как safety net (если METEOR_SQUAD по какой-то причине не сработал,
+-- бот хотя бы не АФК-фармит).
 local function cond_strategy_win_push(bot, ctx)
     return ctx.strategy_active
        and ctx.team_strategy == "WIN"
@@ -116,14 +122,56 @@ local function cond_strategy_win_push(bot, ctx)
        and (ctx.dLane or 9999) < 800
 end
 
--- ── Team strategy: LOSE mid block ──────────────────────────────
--- LOSE-режим: mid-laner (lane==2) внутри lose_mid_block_radius от lane_front
--- → RETREAT. Цель — освободить mid сопернику. Не-mid-боты не затронуты.
+-- ── Team strategy: METEOR_SQUAD (5 WIN-ботов в mid) ────────────
+-- При strategy_enable_time (~20 мин) WIN-команда rally'ится в mid lane перед
+-- enemy T1, util/items.lua сам выстрелит meteor_hammer когда tower в 500r.
+-- Безусловный pull в state из ЛЮБОЙ ноды (LANE_FARM/LANE_WAIT/JUNGLE_FARM/PUSH).
+-- Exit условия — внутри cond_meteor_squad_exit (hp_critical / mid tower уничтожен
+-- → возвращаемся в LANE_FARM continuous push).
+local function cond_meteor_squad(bot, ctx)
+    if not ctx.strategy_active then return false end
+    if ctx.team_strategy ~= "WIN" then return false end
+    if (ctx.hp_pct or 1) < ((BotControllerConfig and BotControllerConfig.meteor_squad_min_hp) or 0.40) then
+        return false  -- HP слишком низкое — пускаем RETREAT-условия выиграть
+    end
+    return true
+end
+
+-- ── Team strategy: SIDE_BAIT (5 LOSE-ботов по сайдам) ──────────
+-- При strategy_enable_time (~20 мин) LOSE-команда расходится по сайдам.
+-- Per-bot lane assignment по GetPlayerID() % 5 (см. context.lua → ctx.side_bait_lane).
+-- Никогда не идут в mid, не пушат волну, сидят на safe_pos своей lane.
+local function cond_side_bait(bot, ctx)
+    if not ctx.strategy_active then return false end
+    if ctx.team_strategy ~= "LOSE" then return false end
+    -- HP-gate такой же: если умираем — RETREAT выигрывает приоритетом.
+    if (ctx.hp_pct or 1) < 0.25 then return false end
+    return true
+end
+
+-- ── Team strategy: LOSE mid block (legacy fallback) ────────────
+-- Сохранено как safety net: если SIDE_BAIT по какой-то причине не сработал
+-- и mid-laner всё-таки оказался в mid — выгнать его в RETREAT.
 local function cond_lose_mid_block(bot, ctx)
     return ctx.strategy_active
        and ctx.team_strategy == "LOSE"
        and (ctx.lane == 2)
        and (ctx.dLane or 9999) < ((BotControllerConfig and BotControllerConfig.lose_mid_block_radius) or 1500)
+end
+
+-- Exit-condition для METEOR_SQUAD: WIN снят / strategy_active=false / мёртв.
+-- Назад в LANE_FARM (continuous push) — если strategy всё ещё WIN, но мы вышли
+-- через hp_critical → попадём в RETREAT по hpCriticalOrTowerTick.
+local function cond_meteor_squad_exit(bot, ctx)
+    if not ctx.strategy_active then return true end
+    if ctx.team_strategy ~= "WIN" then return true end
+    return false
+end
+
+local function cond_side_bait_exit(bot, ctx)
+    if not ctx.strategy_active then return true end
+    if ctx.team_strategy ~= "LOSE" then return true end
+    return false
 end
 
 local function cond_noCreepsStreak_jungle(bot, ctx)
@@ -354,49 +402,72 @@ end
 -- {cond_fn, to_state, reason} — первый match выигрывает.
 -- Приоритет (сверху вниз): safety (RETREAT) → семафор (phase_switch) → reactive.
 -- bot_controller.lua коммитит phase change в state по reason==phase_switch_*.
+-- ВАЖНО: cond_meteor_squad / cond_side_bait в каждом state ставятся ВЫШЕ
+-- остальных transitions (кроме hp_critical retreat). После strategy_enable_time
+-- бот мгновенно переходит в team-coordinated state из ЛЮБОЙ farm-фазы.
 M.Transitions = {
     [M.State.RESPAWN] = {
-        { cond_reachedSafe_withCreeps,  M.State.LANE_FARM, "reached_safe_with_creeps" },
-        { cond_reachedSafe_noCreeps,    M.State.LANE_WAIT, "reached_safe_no_creeps" },
-        { cond_respawn_stuck_fallback,  M.State.LANE_WAIT, "respawn_stuck_fallback" },
+        { cond_meteor_squad,            M.State.METEOR_SQUAD, "strategy_win_meteor" },
+        { cond_side_bait,               M.State.SIDE_BAIT,    "strategy_lose_side_bait" },
+        { cond_reachedSafe_withCreeps,  M.State.LANE_FARM,    "reached_safe_with_creeps" },
+        { cond_reachedSafe_noCreeps,    M.State.LANE_WAIT,    "reached_safe_no_creeps" },
+        { cond_respawn_stuck_fallback,  M.State.LANE_WAIT,    "respawn_stuck_fallback" },
     },
     [M.State.LANE_FARM] = {
-        { cond_hpCriticalOrTowerTick,   M.State.RETREAT,     "hp_or_tower" },
-        { cond_lose_mid_block,          M.State.RETREAT,     "strategy_lose_mid_block" },
-        { cond_stuck_state_timeout,     M.State.LANE_WAIT,   "timeout_recovery" },
-        { cond_strategy_win_push,       M.State.PUSH,        "strategy_win_push" },
-        { cond_phase_switch_to_jungle,  M.State.JUNGLE_FARM, "phase_switch_to_jungle" },
-        { cond_pushable,                M.State.PUSH,        "pushable" },
-        { cond_noCreepsStreak_jungle,   M.State.JUNGLE_FARM, "no_creeps_15s" },
-        { cond_noCreepsStreak_wait,     M.State.LANE_WAIT,   "no_creeps_5s" },
+        { cond_hpCriticalOrTowerTick,   M.State.RETREAT,      "hp_or_tower" },
+        { cond_meteor_squad,            M.State.METEOR_SQUAD, "strategy_win_meteor" },
+        { cond_side_bait,               M.State.SIDE_BAIT,    "strategy_lose_side_bait" },
+        { cond_lose_mid_block,          M.State.RETREAT,      "strategy_lose_mid_block" },
+        { cond_stuck_state_timeout,     M.State.LANE_WAIT,    "timeout_recovery" },
+        { cond_strategy_win_push,       M.State.PUSH,         "strategy_win_push" },
+        { cond_phase_switch_to_jungle,  M.State.JUNGLE_FARM,  "phase_switch_to_jungle" },
+        { cond_pushable,                M.State.PUSH,         "pushable" },
+        { cond_noCreepsStreak_jungle,   M.State.JUNGLE_FARM,  "no_creeps_15s" },
+        { cond_noCreepsStreak_wait,     M.State.LANE_WAIT,    "no_creeps_5s" },
     },
     [M.State.LANE_WAIT] = {
-        { cond_lane_wait_tower_danger,  M.State.RETREAT,     "lane_wait_tower_danger" },
-        { cond_lowHpHarassed,           M.State.RETREAT,     "harassed" },
-        { cond_lose_mid_block,          M.State.RETREAT,     "strategy_lose_mid_block" },
-        { cond_stuck_state_timeout,     M.State.LANE_WAIT,   "timeout_recovery" },
-        { cond_strategy_win_push,       M.State.PUSH,        "strategy_win_push" },
-        { cond_phase_switch_to_jungle,  M.State.JUNGLE_FARM, "phase_switch_to_jungle" },
-        { cond_creepsArrived,           M.State.LANE_FARM,   "creeps_arrived" },
-        { cond_waiting_jungle,          M.State.JUNGLE_FARM, "wait_too_long" },
+        { cond_lane_wait_tower_danger,  M.State.RETREAT,      "lane_wait_tower_danger" },
+        { cond_lowHpHarassed,           M.State.RETREAT,      "harassed" },
+        { cond_meteor_squad,            M.State.METEOR_SQUAD, "strategy_win_meteor" },
+        { cond_side_bait,               M.State.SIDE_BAIT,    "strategy_lose_side_bait" },
+        { cond_lose_mid_block,          M.State.RETREAT,      "strategy_lose_mid_block" },
+        { cond_stuck_state_timeout,     M.State.LANE_WAIT,    "timeout_recovery" },
+        { cond_strategy_win_push,       M.State.PUSH,         "strategy_win_push" },
+        { cond_phase_switch_to_jungle,  M.State.JUNGLE_FARM,  "phase_switch_to_jungle" },
+        { cond_creepsArrived,           M.State.LANE_FARM,    "creeps_arrived" },
+        { cond_waiting_jungle,          M.State.JUNGLE_FARM,  "wait_too_long" },
     },
     [M.State.JUNGLE_FARM] = {
-        { cond_jungle_tower_danger,     M.State.RETREAT,   "jungle_tower_danger" },
-        { cond_jungle_critical,         M.State.RETREAT,   "jungle_critical" },
-        { cond_stuck_jungle,            M.State.LANE_WAIT, "jungle_stuck" },
-        { cond_stuck_state_timeout,     M.State.LANE_WAIT, "timeout_recovery" },
-        { cond_phase_switch_to_lane,    M.State.LANE_FARM, "phase_switch_to_lane" },
-        { cond_jungle_creepsBack,       M.State.LANE_FARM, "lane_creeps_back" },
-        { cond_jungle_lane_empty,       M.State.LANE_WAIT, "camps_empty" },
+        { cond_jungle_tower_danger,     M.State.RETREAT,      "jungle_tower_danger" },
+        { cond_jungle_critical,         M.State.RETREAT,      "jungle_critical" },
+        { cond_meteor_squad,            M.State.METEOR_SQUAD, "strategy_win_meteor" },
+        { cond_side_bait,               M.State.SIDE_BAIT,    "strategy_lose_side_bait" },
+        { cond_stuck_jungle,            M.State.LANE_WAIT,    "jungle_stuck" },
+        { cond_stuck_state_timeout,     M.State.LANE_WAIT,    "timeout_recovery" },
+        { cond_phase_switch_to_lane,    M.State.LANE_FARM,    "phase_switch_to_lane" },
+        { cond_jungle_creepsBack,       M.State.LANE_FARM,    "lane_creeps_back" },
+        { cond_jungle_lane_empty,       M.State.LANE_WAIT,    "camps_empty" },
     },
     [M.State.PUSH] = {
-        { cond_push_retreat,            M.State.RETREAT,   "push_retreat" },
-        { cond_stuck_state_timeout,     M.State.LANE_WAIT, "timeout_recovery" },
-        { cond_push_done,               M.State.LANE_FARM, "push_done" },
+        { cond_push_retreat,            M.State.RETREAT,      "push_retreat" },
+        { cond_meteor_squad,            M.State.METEOR_SQUAD, "strategy_win_meteor" },
+        { cond_stuck_state_timeout,     M.State.LANE_WAIT,    "timeout_recovery" },
+        { cond_push_done,               M.State.LANE_FARM,    "push_done" },
     },
     [M.State.RETREAT] = {
-        { cond_retreat_recovered_lane, M.State.LANE_FARM, "recovered_with_creeps" },
-        { cond_retreat_recovered_wait, M.State.LANE_WAIT, "recovered_no_creeps" },
+        { cond_retreat_recovered_lane,  M.State.LANE_FARM,    "recovered_with_creeps" },
+        { cond_retreat_recovered_wait,  M.State.LANE_WAIT,    "recovered_no_creeps" },
+    },
+    -- Новые team-coordinated states. Exit только через hp_critical (RETREAT) или
+    -- strategy снят. Гистерезис 30 тиков — не флапаем между LANE_FARM и METEOR_SQUAD
+    -- если strategy_active поплывёт около time границы.
+    [M.State.METEOR_SQUAD] = {
+        { cond_hpCriticalOrTowerTick,   M.State.RETREAT,   "hp_or_tower" },
+        { cond_meteor_squad_exit,       M.State.LANE_FARM, "strategy_win_cleared" },
+    },
+    [M.State.SIDE_BAIT] = {
+        { cond_hpCriticalOrTowerTick,   M.State.RETREAT,   "hp_or_tower" },
+        { cond_side_bait_exit,          M.State.LANE_WAIT, "strategy_lose_cleared" },
     },
 }
 

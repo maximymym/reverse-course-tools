@@ -109,16 +109,35 @@ BotControllerConfig = BotControllerConfig or {
 }
 
 -- ── Team strategy (paired-orchestrators 5v5 self-play) ────────────────
--- После N секунд игры команда играет одну из ролей:
---   WIN     — 5 ботов агрессивно пушат mid (cond_strategy_win_push в fsm.lua).
---   LOSE    — боты избегают mid + ускоренно уходят в лес (cond_lose_mid_block).
---   DEBOOST — текущий фарм-цикл (default).
--- Значение читается из C:\temp\andromeda\strategy.txt каждые 50 тиков
--- (см. _read_strategy в bot_controller.lua). Объявлено через `or default`,
--- чтобы F7-reload не затирал runtime-значение, выставленное poll'ом.
+-- После strategy_enable_time секунд игры команда играет одну из ролей:
+--   WIN     — 5 ботов идут в mid и кастуют meteor_hammer на T1 (METEOR_SQUAD state).
+--   LOSE    — 5 ботов расходятся по сайд-линиям, не приходят в mid (SIDE_BAIT state).
+--   DEBOOST — обычный фарм-цикл (default).
+-- Значение читается из C:\temp\andromeda\strategy.json per-pid каждые 50 тиков
+-- (см. _read_strategy в bot_controller.lua).
 BotControllerConfig.team_strategy         = BotControllerConfig.team_strategy         or "DEBOOST"
-BotControllerConfig.strategy_enable_time  = BotControllerConfig.strategy_enable_time  or 1800   -- gt seconds, 30 мин
-BotControllerConfig.lose_mid_block_radius = BotControllerConfig.lose_mid_block_radius or 1500   -- mid avoid radius для LOSE
+BotControllerConfig.strategy_enable_time  = BotControllerConfig.strategy_enable_time  or 1200   -- gt seconds, 20 мин (юзер: meteor combo на 20-й)
+BotControllerConfig.lose_mid_block_radius = BotControllerConfig.lose_mid_block_radius or 1500   -- mid avoid radius (legacy cond_lose_mid_block)
+
+-- ── Two-stand 5v5 scenario (METEOR_SQUAD / SIDE_BAIT) ────────────────
+-- METEOR_SQUAD: WIN-команда переключается в это состояние при game_time >=
+-- strategy_enable_time. Все 5 движутся к mid T1 и стягиваются в один cluster
+-- (centroid alignment), meteor сам выстрелит через util/items.lua handler.
+BotControllerConfig.meteor_squad_lane             = BotControllerConfig.meteor_squad_lane             or 2       -- mid lane id
+BotControllerConfig.meteor_squad_amount           = BotControllerConfig.meteor_squad_amount           or 0.6     -- "push" amount по lane (между T1 и T2 врага)
+BotControllerConfig.meteor_squad_rally_radius     = BotControllerConfig.meteor_squad_rally_radius     or 600     -- если ближайший союзник дальше — подтянуться к нему (clustering)
+BotControllerConfig.meteor_squad_min_hp           = BotControllerConfig.meteor_squad_min_hp           or 0.40    -- ниже — RETREAT, не лезем
+BotControllerConfig.meteor_squad_exit_if_no_tower = BotControllerConfig.meteor_squad_exit_if_no_tower or true    -- mid tower упала — возвращаемся в обычный flow
+
+-- SIDE_BAIT: LOSE-команда. Каждый из 5 ботов получает per-player-id lane:
+--   pid%5 == 0,1 → top (lane 1)
+--   pid%5 == 2,3 → bot (lane 3)
+--   pid%5 == 4   → jungle (фарм safe-side нейтралов)
+-- Сидим на safe_pos своей lane, не идём вперёд, не идём в mid.
+BotControllerConfig.side_bait_safe_amount     = BotControllerConfig.side_bait_safe_amount     or 0.2    -- safe_pos amount (своя half линии)
+BotControllerConfig.side_bait_retreat_dist    = BotControllerConfig.side_bait_retreat_dist    or 1200   -- враг ближе → к фонтану
+BotControllerConfig.side_bait_max_advance     = BotControllerConfig.side_bait_max_advance     or 800    -- максимум forward от safe_pos
+BotControllerConfig.side_bait_keep_distance   = BotControllerConfig.side_bait_keep_distance   or 1500   -- мин дистанция до lane_front (не push'им волну)
 
 -- Пул реплик для чата (короткие, обычные для dota playerspeak)
 BotControllerChatPool = BotControllerChatPool or {
