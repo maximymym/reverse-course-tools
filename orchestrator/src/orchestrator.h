@@ -14,6 +14,8 @@
 #include "orchestrator_ipc_slave.h"
 #include "orchestrator_relay_client.h"
 #include "role_rotation.h"
+#include "sync_start_coordinator.h"
+#include "pair_code.h"
 
 #include <deque>
 #include <map>
@@ -245,8 +247,43 @@ public:
 		std::string  currentStrategy;       // WIN/LOSE/DEBOOST в текущем матче
 		std::string  nextStrategy;          // что будет в следующем
 		std::deque<MatchRecord> history;    // последние 5
+
+		// From RelayPeer::Snapshot (relay-mode только; в direct-режиме нули).
+		uint64_t          msgSent = 0;
+		uint64_t          msgRecv = 0;
+		int64_t           rttMs   = -1;   // -1 = unknown / direct-mode
+
+		// From SyncStartCoordinator::GetSnapshot()
+		SyncStartSnapshot syncStart;
 	};
 	PairingStatus GetPairingStatus() const;
+
+	// ── Pairing lifecycle controls (Wave 2 — used by GUI Wave 3) ─────────
+	// Re-init pairing transports после изменения config (pair code apply, etc.)
+	// Guard: refuse если state==RUNNING OR m_syncStart != IDLE.
+	bool ReinitPairing();
+
+	// Wrapper around StartFarm: gates на pair_complete + recent peer hb + handoff
+	// в SyncStartCoordinator::Initiate. Backward-compat: при uxV2=false ИЛИ
+	// pairing.enabled=false делегирует напрямую на StartFarm() (legacy path).
+	// Returns true если запустился (legacy) ИЛИ если handshake инициирован.
+	bool GuardedStartFarm();
+
+	// Force reconnect (для GUI Reconnect button). В relay-mode bypass'ит backoff
+	// через m_relayPeer->RequestReconnect; в direct-mode делает ReinitPairing.
+	void RequestForceReconnect();
+
+	// Disconnect runtime — останавливает peer'ов и FSM, не stop'ает фарм.
+	void RequestDisconnect();
+
+	// Apply decoded pair code + persist + re-init. Объединяет ApplyPairCode +
+	// SavePairingConfigAtomic + ReinitPairing в один атомарный для GUI шаг.
+	bool ApplyPairCodeAndReinit( const pair_code::Decoded& decoded );
+
+	// Текущий pair code на основе live config (для Generate dialog).
+	// Master генерит код для slave (roleHint="S"), и наоборот. Возвращает ""
+	// если конфиг не заполнен (отсутствуют relayHost / userId / pairSecret / ...).
+	std::string GenerateCurrentPairCode() const;
 
 	// Force override для следующего матча (Force WIN / Force LOSE кнопки в GUI).
 	void SetTeamStrategyOverride( const std::string& mode );  // "auto"|"WIN"|"LOSE"|"DEBOOST"
@@ -274,6 +311,12 @@ private:
 	// OrchestratorIpc / SlavePeer / RelayPeer). Routes к m_pairing для
 	// match-pending координации либо в match_result reconciliation handler.
 	void OnPairingMessage( const PeerMsg& m );
+	// Routes outgoing json через активный transport (relay / slave / master ipc).
+	// Используется m_pairing.onBroadcast и m_syncStart.broadcast.
+	void SendPairingMessage_( const nlohmann::json& msg );
+	// Поднимает pairing transports исходя из текущего m_config.pairing.
+	// Extracted из Init() ради переиспользования в ReinitPairing().
+	void InitPairing_();
 	void TickPostGameDetection();
 	std::string ResolveStrategyForNextMatch();
 	void RestartInstance( int idx );
@@ -318,6 +361,7 @@ private:
 	std::unique_ptr<SlavePeer> m_slavePeer;
 	std::unique_ptr<RelayPeer> m_relayPeer;
 	MatchPairingFsm            m_pairing;
+	SyncStartCoordinator       m_syncStart;
 	RoleRotation             m_roleRotation;
 	std::string              m_currentStrategy;        // "WIN"|"LOSE"|"DEBOOST" в текущем матче
 	bool                     m_postGameHandled = false;

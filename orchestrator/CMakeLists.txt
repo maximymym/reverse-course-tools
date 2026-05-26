@@ -42,6 +42,7 @@ set(SOURCES
     src/orchestrator_relay_client.cpp
     src/match_pairing_fsm.cpp
     src/sync_start_coordinator.cpp
+    src/pair_code.cpp
     src/role_rotation.cpp
     src/strategy_writer.cpp
     src/mem_reclaim.cpp

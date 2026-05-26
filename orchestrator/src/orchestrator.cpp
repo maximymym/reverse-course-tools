@@ -365,98 +365,7 @@ bool Orchestrator::Init( const std::string& configDir, const std::string& exeDir
 	if ( m_config.pairing.enabled )
 	{
 		EnsureTempDirs();
-
-		m_pairing.Init(
-			m_config.pairing.matchSyncTimeoutS,
-			m_config.pairing.maxConsecutiveCancels,
-			m_nBotCount );
-
-		const bool useRelay = ( m_config.pairing.transport == "relay" );
-
-		// Broadcast callback зависит от транспорта.
-		// Direct: master → m_ipc.Broadcast(), slave → m_slavePeer->Send().
-		// Relay:  ОБЕ роли → m_relayPeer->Send() (relay сам пересылает peer'у).
-		m_pairing.onBroadcast = [this]( const nlohmann::json& msg )
-		{
-			if ( m_relayPeer )
-				m_relayPeer->Send( msg );
-			else if ( m_slavePeer )
-				m_slavePeer->Send( msg );
-			else if ( m_config.pairing.role == "master" )
-				m_ipc.Broadcast( msg );
-		};
-
-		// Единая точка приёма peer-сообщений (одна логика для всех 3 транспортов).
-		// Routing match_result vs FSM делает OnPairingMessage().
-		auto onPeerMsg = [this]( const PeerMsg& m )
-		{
-			OnPairingMessage( m );
-		};
-
-		if ( useRelay )
-		{
-			// Validation: multi-tenant relay требует user_id + auth_token, выданные
-			// admin'ом relay-сервиса. Без них relay вернёт auth_failed на каждом
-			// reconnect — нет смысла стартовать peer.
-			if ( m_config.pairing.relayHost.empty() )
-			{
-				Log( "[pairing] relay transport selected but relay_host empty — pairing inactive" );
-			}
-			else if ( m_config.pairing.userId.empty() || m_config.pairing.userAuthToken.empty() )
-			{
-				Log( "[pairing] relay transport requires user_id AND user_auth_token in farm.json — "
-				     "pairing inactive (contact relay admin to get credentials)" );
-			}
-			else
-			{
-				m_relayPeer.reset( new RelayPeer() );
-				if ( m_relayPeer->Start(
-					m_config.pairing.relayHost, m_config.pairing.relayPort,
-					m_config.pairing.userId, m_config.pairing.userAuthToken,
-					m_config.pairing.pairId, m_config.pairing.role,
-					m_config.pairing.pairSecret, onPeerMsg ) )
-				{
-					Log( "[pairing] relay client started: host=%s:%u user_id=%s pair_id=%s role=%s",
-						m_config.pairing.relayHost.c_str(),
-						(unsigned)m_config.pairing.relayPort,
-						m_config.pairing.userId.c_str(),
-						m_config.pairing.pairId.c_str(),
-						m_config.pairing.role.c_str() );
-				}
-				else
-				{
-					Log( "[pairing] relay client start failed: %s",
-						m_relayPeer->LastError().c_str() );
-				}
-			}
-		}
-		else if ( m_config.pairing.role == "master" )
-		{
-			if ( m_ipc.Start( m_config.pairing.ipcPort, m_config.pairing.masterIp,
-				m_config.pairing.pairSecret, onPeerMsg ) )
-			{
-				Log( "[pairing] master listening on %s:%u",
-					m_config.pairing.masterIp.c_str(), (unsigned)m_config.pairing.ipcPort );
-			}
-			else
-			{
-				Log( "[pairing] master start failed: %s", m_ipc.LastError().c_str() );
-			}
-		}
-		else
-		{
-			m_slavePeer.reset( new SlavePeer() );
-			if ( m_slavePeer->Start( m_config.pairing.masterIp, m_config.pairing.ipcPort,
-				m_config.pairing.pairSecret, onPeerMsg ) )
-			{
-				Log( "[pairing] slave connecting to %s:%u",
-					m_config.pairing.masterIp.c_str(), (unsigned)m_config.pairing.ipcPort );
-			}
-			else
-			{
-				Log( "[pairing] slave start failed: %s", m_slavePeer->LastError().c_str() );
-			}
-		}
+		InitPairing_();
 
 		// Загрузить ротацию ролей.
 		m_roleRotation.Load( "C:\\temp\\andromeda\\last_role.json" );
@@ -466,6 +375,130 @@ bool Orchestrator::Init( const std::string& configDir, const std::string& exeDir
 	}
 
 	return true;
+}
+
+// Поднимает pairing transports + wires callbacks. Extracted из Init() чтобы
+// переиспользовать в ReinitPairing(). Caller гарантирует что
+// m_config.pairing.enabled == true и старые peer'ы остановлены/освобождены.
+void Orchestrator::InitPairing_()
+{
+	m_pairing.Init(
+		m_config.pairing.matchSyncTimeoutS,
+		m_config.pairing.maxConsecutiveCancels,
+		m_nBotCount );
+
+	const bool useRelay = ( m_config.pairing.transport == "relay" );
+
+	// Broadcast callback теперь использует единый helper.
+	m_pairing.onBroadcast = [this]( const nlohmann::json& msg )
+	{
+		SendPairingMessage_( msg );
+	};
+
+	// Sync-start handshake routes через тот же transport.
+	m_syncStart.broadcast = [this]( const nlohmann::json& msg )
+	{
+		SendPairingMessage_( msg );
+	};
+	m_syncStart.startFarmFn = [this]()
+	{
+		Log( "[sync-start] handshake complete → StartFarmThread" );
+		std::thread( &Orchestrator::StartFarmThread, this ).detach();
+	};
+	m_syncStart.onStateChange = [this]( SyncStartState s )
+	{
+		Log( "[sync-start] state → %d", (int)s );
+	};
+
+	// Match-FSM передаёт sync-start msg types в наш SyncStartCoordinator.
+	m_pairing.onSyncStartMsg = [this]( const PeerMsg& m )
+	{
+		m_syncStart.OnPeerMessage( m.type, m.body );
+	};
+
+	// Единая точка приёма peer-сообщений.
+	auto onPeerMsg = [this]( const PeerMsg& m )
+	{
+		OnPairingMessage( m );
+	};
+
+	// RelayPeer state callback (для GUI status badge).
+	auto onRelayState = [this]( RelayPeer::State s )
+	{
+		Log( "[pairing] relay state: %d", (int)s );
+	};
+
+	if ( useRelay )
+	{
+		if ( m_config.pairing.relayHost.empty() )
+		{
+			Log( "[pairing] relay transport selected but relay_host empty — pairing inactive" );
+		}
+		else if ( m_config.pairing.userId.empty() || m_config.pairing.userAuthToken.empty() )
+		{
+			Log( "[pairing] relay transport requires user_id AND user_auth_token in farm.json — "
+			     "pairing inactive (contact relay admin to get credentials)" );
+		}
+		else
+		{
+			m_relayPeer.reset( new RelayPeer() );
+			if ( m_relayPeer->Start(
+				m_config.pairing.relayHost, m_config.pairing.relayPort,
+				m_config.pairing.userId, m_config.pairing.userAuthToken,
+				m_config.pairing.pairId, m_config.pairing.role,
+				m_config.pairing.pairSecret, onPeerMsg, onRelayState ) )
+			{
+				Log( "[pairing] relay client started: host=%s:%u user_id=%s pair_id=%s role=%s",
+					m_config.pairing.relayHost.c_str(),
+					(unsigned)m_config.pairing.relayPort,
+					m_config.pairing.userId.c_str(),
+					m_config.pairing.pairId.c_str(),
+					m_config.pairing.role.c_str() );
+			}
+			else
+			{
+				Log( "[pairing] relay client start failed: %s",
+					m_relayPeer->LastError().c_str() );
+			}
+		}
+	}
+	else if ( m_config.pairing.role == "master" )
+	{
+		if ( m_ipc.Start( m_config.pairing.ipcPort, m_config.pairing.masterIp,
+			m_config.pairing.pairSecret, onPeerMsg ) )
+		{
+			Log( "[pairing] master listening on %s:%u",
+				m_config.pairing.masterIp.c_str(), (unsigned)m_config.pairing.ipcPort );
+		}
+		else
+		{
+			Log( "[pairing] master start failed: %s", m_ipc.LastError().c_str() );
+		}
+	}
+	else
+	{
+		m_slavePeer.reset( new SlavePeer() );
+		if ( m_slavePeer->Start( m_config.pairing.masterIp, m_config.pairing.ipcPort,
+			m_config.pairing.pairSecret, onPeerMsg ) )
+		{
+			Log( "[pairing] slave connecting to %s:%u",
+				m_config.pairing.masterIp.c_str(), (unsigned)m_config.pairing.ipcPort );
+		}
+		else
+		{
+			Log( "[pairing] slave start failed: %s", m_slavePeer->LastError().c_str() );
+		}
+	}
+}
+
+void Orchestrator::SendPairingMessage_( const nlohmann::json& msg )
+{
+	if ( m_relayPeer )
+		m_relayPeer->Send( msg );
+	else if ( m_slavePeer )
+		m_slavePeer->Send( msg );
+	else if ( m_config.pairing.role == "master" )
+		m_ipc.Broadcast( msg );
 }
 
 void Orchestrator::EarlyStartProxy( const std::string& exeDir )
@@ -1379,6 +1412,9 @@ void Orchestrator::MonitorTick()
 	if ( m_config.pairing.enabled )
 	{
 		uint64_t nowMsP = crash_watchdog::NowMs();
+
+		// SyncStartCoordinator всегда тикается (timeouts независимы от long-pause).
+		m_syncStart.Tick( (int64_t)nowMsP );
 
 		// Long-pause после max_consecutive_cancels — не сканим pending файлы,
 		// не Tick'аем FSM. Просто ждём.
@@ -2808,6 +2844,19 @@ Orchestrator::PairingStatus Orchestrator::GetPairingStatus() const
 		s.nextStrategy = ( m_roleRotation.LastStrategy() == "WIN" ) ? std::string( "LOSE" ) : std::string( "WIN" );
 
 	s.history = m_roleRotation.History();
+
+	// Relay telemetry (msgSent / msgRecv / rttMs).
+	if ( m_relayPeer )
+	{
+		auto snap = m_relayPeer->GetSnapshot();
+		s.msgSent = snap.msgSent;
+		s.msgRecv = snap.msgRecv;
+		s.rttMs   = snap.lastRttMs;
+	}
+
+	// SyncStartCoordinator snapshot.
+	s.syncStart = m_syncStart.GetSnapshot();
+
 	return s;
 }
 
@@ -2932,4 +2981,184 @@ void Orchestrator::Log( const char* fmt, ... )
 	m_log.push_back( entry );
 	if ( m_log.size() > 200 )
 		m_log.erase( m_log.begin() );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Pairing lifecycle controls (Wave 2)
+// ─────────────────────────────────────────────────────────────────────────
+
+bool Orchestrator::ReinitPairing()
+{
+	if ( m_state == State::RUNNING )
+	{
+		Log( "[pairing] ReinitPairing refused: farm RUNNING" );
+		return false;
+	}
+
+	auto sync = m_syncStart.GetSnapshot();
+	if ( sync.state != SyncStartState::IDLE )
+	{
+		Log( "[pairing] ReinitPairing refused: sync-start in progress (state=%d)",
+			(int)sync.state );
+		return false;
+	}
+
+	// Stop old peers (любые из 3 транспортов).
+	if ( m_relayPeer )
+	{
+		m_relayPeer->Stop();
+		m_relayPeer.reset();
+	}
+	m_ipc.Stop();
+	if ( m_slavePeer )
+	{
+		m_slavePeer->Stop();
+		m_slavePeer.reset();
+	}
+
+	m_pairing.Reset();
+	m_syncStart.Reset( "reinit" );
+
+	if ( !m_config.pairing.enabled )
+	{
+		Log( "[pairing] reinitialized (disabled — no transport started)" );
+		return true;
+	}
+
+	EnsureTempDirs();
+	InitPairing_();
+
+	Log( "[pairing] reinitialized (transport=%s role=%s)",
+		m_config.pairing.transport.c_str(), m_config.pairing.role.c_str() );
+	return true;
+}
+
+bool Orchestrator::GuardedStartFarm()
+{
+	// Legacy path: uxV2 не активен → прямой StartFarm.
+	if ( !m_config.pairing.uxV2 )
+	{
+		StartFarm();
+		return true;
+	}
+
+	// uxV2=true но pairing выключен → single-stand, fallback на StartFarm.
+	if ( !m_config.pairing.enabled )
+	{
+		StartFarm();
+		return true;
+	}
+
+	// Pairing required: peer должен быть connected + hb свежий.
+	PairingStatus ps = GetPairingStatus();
+	if ( !ps.connected )
+	{
+		Log( "[pairing] GuardedStartFarm refused: not connected" );
+		return false;
+	}
+	if ( ps.lastPeerHbAgeMs < 0 || ps.lastPeerHbAgeMs > 5000 )
+	{
+		Log( "[pairing] GuardedStartFarm refused: peer hb stale (%lld ms)",
+			(long long)ps.lastPeerHbAgeMs );
+		return false;
+	}
+
+	auto sync = m_syncStart.GetSnapshot();
+	if ( sync.state != SyncStartState::IDLE )
+	{
+		Log( "[pairing] GuardedStartFarm refused: sync-start busy (state=%d)",
+			(int)sync.state );
+		return false;
+	}
+
+	// configHash — placeholder. Не security-critical: используется только в
+	// start_request body для optional sanity check на peer side.
+	std::string configHash = "todo-hash";
+	if ( !m_syncStart.Initiate( m_config.pairing.role, configHash ) )
+	{
+		Log( "[pairing] GuardedStartFarm refused: SyncStartCoordinator::Initiate failed" );
+		return false;
+	}
+
+	Log( "[pairing] GuardedStartFarm initiated handshake (role=%s)",
+		m_config.pairing.role.c_str() );
+	return true;
+}
+
+void Orchestrator::RequestForceReconnect()
+{
+	if ( m_relayPeer )
+	{
+		m_relayPeer->RequestReconnect();
+		Log( "[pairing] force reconnect requested" );
+		return;
+	}
+
+	// Direct mode: нет separate "force reconnect" API на m_ipc/m_slavePeer.
+	// Делаем полный Reinit.
+	Log( "[pairing] force reconnect: direct mode — falling back to ReinitPairing" );
+	ReinitPairing();
+}
+
+void Orchestrator::RequestDisconnect()
+{
+	if ( m_relayPeer )
+	{
+		m_relayPeer->Stop();
+		m_relayPeer.reset();
+	}
+	m_ipc.Stop();
+	if ( m_slavePeer )
+	{
+		m_slavePeer->Stop();
+		m_slavePeer.reset();
+	}
+	m_pairing.Reset();
+	m_syncStart.Reset( "user_disconnect" );
+	Log( "[pairing] disconnected (user)" );
+}
+
+bool Orchestrator::ApplyPairCodeAndReinit( const pair_code::Decoded& decoded )
+{
+	// In-memory apply.
+	config::ApplyPairCode( decoded, m_config.pairing );
+	m_config.pairing.uxV2    = true;
+	m_config.pairing.enabled = true;
+
+	std::string path = m_config.configDir + "\\farm.json";
+	if ( !config::SavePairingConfigAtomic( path, m_config.pairing ) )
+	{
+		Log( "[pairing] ApplyPairCodeAndReinit: SavePairingConfigAtomic FAILED (%s)",
+			path.c_str() );
+		return false;
+	}
+
+	if ( !ReinitPairing() )
+	{
+		Log( "[pairing] ApplyPairCodeAndReinit: ReinitPairing FAILED "
+			"(config saved but transports not active)" );
+		return false;
+	}
+
+	Log( "[pairing] ApplyPairCodeAndReinit OK (relay=%s user=%s pair=%s role=%s)",
+		m_config.pairing.relayHost.c_str(),
+		m_config.pairing.userId.c_str(),
+		m_config.pairing.pairId.c_str(),
+		m_config.pairing.role.c_str() );
+	return true;
+}
+
+std::string Orchestrator::GenerateCurrentPairCode() const
+{
+	const auto& p = m_config.pairing;
+	if ( p.relayHost.empty() || p.userId.empty() || p.userAuthToken.empty() ||
+	     p.pairId.empty() || p.pairSecret.empty() )
+	{
+		return "";
+	}
+	// Master генерит код для slave (peer противоположной роли).
+	std::string oppositeRole = ( p.role == "master" ) ? "S" : "M";
+	return pair_code::Encode(
+		p.relayHost, p.relayPort, p.userId, p.userAuthToken,
+		p.pairId, p.pairSecret, oppositeRole, 0 );
 }
