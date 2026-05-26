@@ -107,12 +107,14 @@ bool SyncStartCoordinator::Initiate( const std::string& myRole, const std::strin
 		m_requestId   = GenerateRequestId_();
 		m_lastDeclineReason.clear();
 
-		// Build start_request body.
+		// Build start_request — payload в "body" (ipc_proto::Sign wire contract).
 		json b;
-		b["type"]        = "start_request";
-		b["request_id"]  = m_requestId;
-		b["role"]        = myRole;
-		b["config_hash"] = configHash;
+		b["type"] = "start_request";
+		b["body"] = {
+			{ "request_id",  m_requestId },
+			{ "role",        myRole },
+			{ "config_hash", configHash },
+		};
 		actions.broadcasts.push_back( std::move( b ) );
 
 		TransitionTo_( SyncStartState::WAITING_PEER_ACK, NowMs_(), actions );
@@ -129,9 +131,11 @@ void SyncStartCoordinator::UserCancel()
 		if ( m_state != SyncStartState::WAITING_PEER_ACK ) return;
 
 		json b;
-		b["type"]       = "start_cancel";
-		b["request_id"] = m_requestId;
-		b["reason"]     = "user_cancel";
+		b["type"] = "start_cancel";
+		b["body"] = {
+			{ "request_id", m_requestId },
+			{ "reason",     "user_cancel" },
+		};
 		actions.broadcasts.push_back( std::move( b ) );
 
 		m_lastDeclineReason = "user_cancel";
@@ -148,9 +152,11 @@ void SyncStartCoordinator::UserAccept()
 		if ( m_state != SyncStartState::PEER_REQUESTED ) return;
 
 		json b;
-		b["type"]       = "start_ack";
-		b["request_id"] = m_requestId;
-		b["accept"]     = true;
+		b["type"] = "start_ack";
+		b["body"] = {
+			{ "request_id", m_requestId },
+			{ "accept",     true },
+		};
 		actions.broadcasts.push_back( std::move( b ) );
 
 		// Через CONFIRMING сразу в STARTING — handshake завершён, наш ack отправлен,
@@ -181,10 +187,12 @@ void SyncStartCoordinator::UserDecline( const std::string& reason )
 		if ( m_state != SyncStartState::PEER_REQUESTED ) return;
 
 		json b;
-		b["type"]       = "start_ack";
-		b["request_id"] = m_requestId;
-		b["accept"]     = false;
-		b["reason"]     = reason;
+		b["type"] = "start_ack";
+		b["body"] = {
+			{ "request_id", m_requestId },
+			{ "accept",     false },
+			{ "reason",     reason },
+		};
 		actions.broadcasts.push_back( std::move( b ) );
 
 		m_lastDeclineReason = reason.empty() ? std::string( "user_decline" ) : reason;
@@ -227,9 +235,11 @@ void SyncStartCoordinator::OnPeerMessage( const std::string& msgType, const json
 				}
 				// Мы loser: cancel свой request СТАРЫМ id, потом примем peer'а.
 				json cancel;
-				cancel["type"]       = "start_cancel";
-				cancel["request_id"] = m_requestId;
-				cancel["reason"]     = "race_lost";
+				cancel["type"] = "start_cancel";
+				cancel["body"] = {
+					{ "request_id", m_requestId },
+					{ "reason",     "race_lost" },
+				};
 				actions.broadcasts.push_back( std::move( cancel ) );
 				m_lastDeclineReason     = "race_lost";
 				acceptIntoPeerRequested = true;
@@ -243,10 +253,12 @@ void SyncStartCoordinator::OnPeerMessage( const std::string& msgType, const json
 				// Мы заняты (CONFIRMING/STARTING/DECLINED/TIMEOUT) — peer должен
 				// был выждать. Отбрасываем decline'ом, state не меняем.
 				json ack;
-				ack["type"]       = "start_ack";
-				ack["request_id"] = incomingId;
-				ack["accept"]     = false;
-				ack["reason"]     = "busy";
+				ack["type"] = "start_ack";
+				ack["body"] = {
+					{ "request_id", incomingId },
+					{ "accept",     false },
+					{ "reason",     "busy" },
+				};
 				actions.broadcasts.push_back( std::move( ack ) );
 			}
 
