@@ -285,6 +285,11 @@ public:
 	// если конфиг не заполнен (отсутствуют relayHost / userId / pairSecret / ...).
 	std::string GenerateCurrentPairCode() const;
 
+	// SyncStartCoordinator user-action wrappers (used by GUI Sync Start modal).
+	void SyncStartUserAccept();
+	void SyncStartUserDecline( const std::string& reason );
+	void SyncStartUserCancel();
+
 	// Force override для следующего матча (Force WIN / Force LOSE кнопки в GUI).
 	void SetTeamStrategyOverride( const std::string& mode );  // "auto"|"WIN"|"LOSE"|"DEBOOST"
 	const std::string& GetTeamStrategyMode() const { return m_config.teamStrategyMode; }

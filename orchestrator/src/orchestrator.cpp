@@ -3162,3 +3162,18 @@ std::string Orchestrator::GenerateCurrentPairCode() const
 		p.relayHost, p.relayPort, p.userId, p.userAuthToken,
 		p.pairId, p.pairSecret, oppositeRole, 0 );
 }
+
+void Orchestrator::SyncStartUserAccept()
+{
+	m_syncStart.UserAccept();
+}
+
+void Orchestrator::SyncStartUserDecline( const std::string& reason )
+{
+	m_syncStart.UserDecline( reason );
+}
+
+void Orchestrator::SyncStartUserCancel()
+{
+	m_syncStart.UserCancel();
+}

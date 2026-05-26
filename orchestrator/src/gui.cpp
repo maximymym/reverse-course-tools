@@ -1687,6 +1687,275 @@ static void RenderPcStatsPanel( Orchestrator& orch )
 }
 
 // ═══════════════════════════════════════════════════════════
+// T10: Pair Code + Sync Start modal dialogs
+// ═══════════════════════════════════════════════════════════
+//
+// Triggered by s_show*PairCodeDialog flags (set by T9 Pairing Panel buttons)
+// and by SyncStartCoordinator state (auto for responder-side accept/decline).
+// Inline render via OpenPopup/BeginPopupModal — single shot per flag-edge.
+
+static void RenderPairCodeGenerateModal_( Orchestrator& orch )
+{
+	static bool wasOpened = false;
+	static std::string s_code;
+
+	if ( !s_showGeneratePairCodeDialog )
+	{
+		if ( wasOpened )
+		{
+			wasOpened = false;
+			s_code.clear();
+		}
+		return;
+	}
+
+	if ( !wasOpened )
+	{
+		ImGui::OpenPopup( "Generate Pair Code" );
+		wasOpened = true;
+		s_code = orch.GenerateCurrentPairCode();
+	}
+
+	ImGui::SetNextWindowSize( ImVec2( 600, 280 ), ImGuiCond_Always );
+	if ( ImGui::BeginPopupModal( "Generate Pair Code", nullptr,
+			ImGuiWindowFlags_NoResize ) )
+	{
+		ImGui::TextWrapped( "Передайте этот код вашему партнёру. "
+			"После Paste у партнёра — оба orchestrator подключатся к одному pair." );
+		ImGui::Spacing();
+
+		if ( s_code.empty() )
+		{
+			ImGui::TextColored( theme::V( theme::kColCrash ),
+				"ERROR: pairing config неполный.\n"
+				"В farm.json должны быть выставлены relay_host, user_id,\n"
+				"user_auth_token, pair_id, pair_secret.\n"
+				"Если у вас новая установка — попросите код от Master orchestrator'а." );
+		}
+		else
+		{
+			ImGui::PushItemWidth( -1 );
+			char buf[512];
+			strncpy_s( buf, sizeof( buf ), s_code.c_str(), _TRUNCATE );
+			ImGui::InputTextMultiline( "##paircode", buf, sizeof( buf ),
+				ImVec2( -1, 60 ), ImGuiInputTextFlags_ReadOnly );
+			ImGui::PopItemWidth();
+
+			ImGui::Spacing();
+			if ( theme::ChamferedButton( "COPY", ImVec2( 120, 28 ),
+					theme::kColGold, theme::kColGold, theme::kColBg0, true ) )
+			{
+				if ( theme::CopyToClipboard( s_code ) )
+					orch.LogPublic( "[pairing] pair code copied to clipboard" );
+			}
+			ImGui::SameLine();
+			if ( theme::ChamferedButton( "REGENERATE", ImVec2( 140, 28 ),
+					theme::kColWarn, theme::kColWarn, theme::kColBg0, true ) )
+			{
+				// Phase 2 будет ротейтить pair_secret; пока — re-encode existing.
+				s_code = orch.GenerateCurrentPairCode();
+			}
+		}
+
+		ImGui::Spacing();
+		ImGui::TextColored( theme::V( theme::kColWarn ),
+			"WARN: anyone with this code can join your relay pair.\n"
+			"Share только через private channel." );
+
+		ImGui::Spacing();
+		if ( theme::ChamferedButton( "CLOSE", ImVec2( 100, 28 ),
+				theme::kColIdle, theme::kColIdle, theme::kColBg0, true ) )
+		{
+			s_showGeneratePairCodeDialog = false;
+			wasOpened = false;
+			s_code.clear();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
+static void RenderPairCodePasteModal_( Orchestrator& orch )
+{
+	static bool wasOpened = false;
+	static char s_inputBuf[512] = {0};
+	static std::string s_lastError;
+	static pair_code::DecodeResult s_decoded;
+	static bool s_decodedOk = false;
+	static std::string s_lastDecodedInput;
+
+	if ( !s_showPastePairCodeDialog )
+	{
+		if ( wasOpened )
+		{
+			wasOpened = false;
+			s_inputBuf[0] = 0;
+			s_lastError.clear();
+			s_decodedOk = false;
+			s_lastDecodedInput.clear();
+		}
+		return;
+	}
+
+	if ( !wasOpened )
+	{
+		ImGui::OpenPopup( "Paste Pair Code" );
+		wasOpened = true;
+		s_inputBuf[0] = 0;
+		s_lastError.clear();
+		s_decodedOk = false;
+		s_lastDecodedInput.clear();
+	}
+
+	ImGui::SetNextWindowSize( ImVec2( 600, 380 ), ImGuiCond_Always );
+	if ( ImGui::BeginPopupModal( "Paste Pair Code", nullptr,
+			ImGuiWindowFlags_NoResize ) )
+	{
+		ImGui::TextWrapped( "Paste код полученный от партнёра." );
+		ImGui::Spacing();
+
+		ImGui::PushItemWidth( -1 );
+		ImGui::InputTextMultiline( "##paste", s_inputBuf, sizeof( s_inputBuf ),
+			ImVec2( -1, 60 ) );
+		ImGui::PopItemWidth();
+
+		// Re-decode только если input изменился (избегаем re-parse каждый frame).
+		if ( s_inputBuf[0] != 0 && s_inputBuf != s_lastDecodedInput )
+		{
+			s_lastDecodedInput = s_inputBuf;
+			s_decoded = pair_code::Decode( s_inputBuf );
+			s_decodedOk = s_decoded.ok;
+			s_lastError = s_decodedOk ? "" : pair_code::Describe( s_decoded.error );
+		}
+
+		ImGui::Spacing();
+		if ( s_inputBuf[0] != 0 )
+		{
+			if ( s_decodedOk )
+			{
+				ImGui::TextColored( theme::V( theme::kColSignal ),
+					"OK: code valid:" );
+				ImGui::Text( "  Relay: %s:%u",
+					s_decoded.decoded.relayHost.c_str(),
+					(unsigned)s_decoded.decoded.relayPort );
+				ImGui::Text( "  User:  %s   Pair: %s",
+					s_decoded.decoded.userId.c_str(),
+					s_decoded.decoded.pairId.c_str() );
+				const char* assigned =
+					( s_decoded.decoded.roleHint == "M" ) ? "master" : "slave";
+				ImGui::Text( "  Role:  %s", assigned );
+				if ( s_decoded.decoded.ttlSeconds > 0 )
+					ImGui::Text( "  TTL:   %d s", s_decoded.decoded.ttlSeconds );
+			}
+			else
+			{
+				ImGui::TextColored( theme::V( theme::kColCrash ),
+					"ERROR: %s", s_lastError.c_str() );
+			}
+		}
+
+		ImGui::Spacing();
+
+		const bool canApply = s_decodedOk;
+		const ImU32 applyFill   = canApply ? theme::kColGold    : theme::kColBg2;
+		const ImU32 applyBorder = canApply ? theme::kColGold    : theme::kColLineHot;
+		const ImU32 applyText   = canApply ? theme::kColBg0     : theme::kColInkMute;
+		if ( theme::ChamferedButton( "APPLY & CONNECT", ImVec2( 180, 32 ),
+				applyFill, applyBorder, applyText, canApply ) )
+		{
+			if ( canApply )
+			{
+				if ( orch.ApplyPairCodeAndReinit( s_decoded.decoded ) )
+				{
+					orch.LogPublic( "[pairing] pair code applied + reinit OK" );
+					s_showPastePairCodeDialog = false;
+					wasOpened = false;
+					s_inputBuf[0] = 0;
+					s_lastError.clear();
+					s_decodedOk = false;
+					s_lastDecodedInput.clear();
+					ImGui::CloseCurrentPopup();
+				}
+				else
+				{
+					s_lastError = "Apply failed — see orchestrator log";
+					orch.LogPublic( "[pairing] pair code apply FAILED" );
+				}
+			}
+		}
+		ImGui::SameLine();
+		if ( theme::ChamferedButton( "CANCEL", ImVec2( 120, 32 ),
+				theme::kColIdle, theme::kColIdle, theme::kColBg0, true ) )
+		{
+			s_showPastePairCodeDialog = false;
+			wasOpened = false;
+			s_inputBuf[0] = 0;
+			s_lastError.clear();
+			s_decodedOk = false;
+			s_lastDecodedInput.clear();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
+static void RenderSyncStartModal_( Orchestrator& orch )
+{
+	static bool wasOpened = false;
+
+	auto ps = orch.GetPairingStatus();
+	const bool show = ( ps.syncStart.state == SyncStartState::PEER_REQUESTED );
+
+	if ( !show )
+	{
+		if ( wasOpened )
+		{
+			wasOpened = false;  // coordinator advanced state → drop popup
+		}
+		return;
+	}
+
+	if ( !wasOpened )
+	{
+		ImGui::OpenPopup( "Peer Wants To Start Farming" );
+		wasOpened = true;
+	}
+
+	ImGui::SetNextWindowSize( ImVec2( 520, 220 ), ImGuiCond_Always );
+	if ( ImGui::BeginPopupModal( "Peer Wants To Start Farming", nullptr,
+			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove ) )
+	{
+		ImGui::TextWrapped( "Партнёр (%s) готов запустить ферму.",
+			ps.syncStart.peerRole.empty() ? "peer" : ps.syncStart.peerRole.c_str() );
+		ImGui::Spacing();
+
+		const int64_t now      = (int64_t)GetTickCount64();
+		const int64_t deadline = ps.syncStart.ackDeadlineMs;
+		const int secsLeft = ( deadline > 0 )
+			? (int)( ( deadline - now ) / 1000 )
+			: -1;
+		if ( secsLeft >= 0 )
+			ImGui::Text( "Auto-decline через %d секунд...", secsLeft );
+
+		ImGui::Spacing();
+		ImGui::Spacing();
+
+		if ( theme::ChamferedButton( "ACCEPT & START", ImVec2( 200, 36 ),
+				theme::kColSignal, theme::kColSignal, theme::kColBg0, true ) )
+		{
+			orch.SyncStartUserAccept();
+		}
+		ImGui::SameLine();
+		if ( theme::ChamferedButton( "DECLINE", ImVec2( 130, 36 ),
+				theme::kColCrash, theme::kColCrash, theme::kColBg0, true ) )
+		{
+			orch.SyncStartUserDecline( "user_declined" );
+		}
+		ImGui::EndPopup();
+	}
+}
+
+// ═══════════════════════════════════════════════════════════
 // SCREEN 3: Dashboard
 // ═══════════════════════════════════════════════════════════
 
@@ -1783,9 +2052,37 @@ static void RenderDashboard( Orchestrator& orch )
 	// ── Command bar — chamfered tarnished-gold buttons in a row ──
 	if ( isIdle && !isBusy )
 	{
-		if ( theme::ChamferedButton( "START FARM", ImVec2( 150, 32 ),
-				theme::kColGold, theme::kColGold, theme::kColBg0, true ) )
-			orch.StartFarm();
+		// Pairing-aware START FARM (uxV2). When uxV2+enabled — gate the button
+		// on peer connectivity (recent hb < 5s) and route через GuardedStartFarm
+		// для sync-start handshake. Legacy path (uxV2 off) — direct StartFarm.
+		const auto& cfg = orch.GetConfig();
+		const bool pairingGate = cfg.pairing.uxV2 && cfg.pairing.enabled;
+		auto psBtn = orch.GetPairingStatus();
+		const bool pairingReady = !pairingGate ||
+			( psBtn.connected && psBtn.lastPeerHbAgeMs >= 0 && psBtn.lastPeerHbAgeMs < 5000 );
+		const bool startFarmEnabled = pairingReady;
+		const char* startBtnLabel = pairingGate ? "START FARM (sync)" : "START FARM";
+		const ImVec2 startBtnSize = pairingGate ? ImVec2( 170, 32 ) : ImVec2( 150, 32 );
+		const ImU32 sbFill   = startFarmEnabled ? theme::kColGold    : theme::kColBg2;
+		const ImU32 sbBorder = startFarmEnabled ? theme::kColGold    : theme::kColLineHot;
+		const ImU32 sbText   = startFarmEnabled ? theme::kColBg0     : theme::kColInkMute;
+		if ( theme::ChamferedButton( startBtnLabel, startBtnSize,
+				sbFill, sbBorder, sbText, startFarmEnabled ) )
+		{
+			if ( startFarmEnabled )
+			{
+				if ( pairingGate )
+					orch.GuardedStartFarm();
+				else
+					orch.StartFarm();
+			}
+		}
+		if ( !startFarmEnabled && pairingGate && ImGui::IsItemHovered() )
+		{
+			ImGui::SetTooltip( "Peer не подключён или связь устарела (>5s).\n"
+				"Скажите второму оператору запустить orchestrator,\n"
+				"или нажмите RECONNECT в Pairing panel." );
+		}
 	}
 	else if ( isRunning && !isBusy )
 	{
@@ -3871,6 +4168,13 @@ static void RenderDashboard( Orchestrator& orch )
 	ImGui::EndChild();
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor( 2 );
+
+	// T10 modal dialogs (Pair Code Generate / Paste / Sync Start). Rendered
+	// inside ImGui frame scope of this Window, после log panel; флаги
+	// выставляются T9 Pairing Panel buttons + SyncStartCoordinator state.
+	RenderPairCodeGenerateModal_( orch );
+	RenderPairCodePasteModal_( orch );
+	RenderSyncStartModal_( orch );
 
 	ImGui::End();
 	ImGui::PopStyleColor();  // WindowBg
