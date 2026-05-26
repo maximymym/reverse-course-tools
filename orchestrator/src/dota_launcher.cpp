@@ -416,24 +416,41 @@ DWORD DotaLauncher::LaunchDotaOnly( int instanceIdx, const FarmConfig& cfg, DWOR
 	// (использует тот же VAC parent-process spoof = steam.exe).
 	SteamLauncher launcher;
 	DWORD spawnedPid = launcher.LaunchDota( instanceIdx, cfg, steamPid );
-	// spawnedPid возвращает PID НАШЕГО CreateProcess'а на dota2.exe из BotDota,
-	// но Source2 может перезапустить себя через Steam IPC (single-instance check).
-	// Поэтому ищем НОВЫЙ PID который не в excludeExistingPids.
-	(void)spawnedPid; // используем как fallback ниже
 
-	// 3. Poll FindDotaPids() пока не появится новый.
+	// 3. Attribute PID к THIS recovery thread'у. CR-FIX 2026-05-26:
+	// раньше код возвращал "первый PID не из excludeExistingPids" — при
+	// concurrent recovery threads оба видели одну новую dota и оба её
+	// claim'или → один из двух recovery остаётся без процесса → fake-DEAD.
+	// Сейчас приоритет:
+	//   (a) spawnedPid если IsProcessAlive (наш собственный CreateProcess —
+	//       100% наш) — но только если он не в excludeExistingPids,
+	//       иначе это zombie/reuse.
+	//   (b) если spawnedPid 0 или мёртв — fallback на FindDotaPids ∖ exclude
+	//       (старый поведение, для случая когда Steam IPC сам перезапускает
+	//       dota через single-instance check).
+	// Дополнительная защита: m_recoveryMx в orchestrator.cpp serializes
+	// thread'ы, поэтому race по сути устранён, но Fix (a)+(b) держим как
+	// belt+suspenders на случай если кто-то снимет mutex в будущем.
 	DWORD start = GetTickCount();
 	while ( (int)( GetTickCount() - start ) < timeoutMs )
 	{
+		// (a) Trust spawnedPid если он живой и не в exclude list
+		if ( spawnedPid != 0 && IsProcessAlive( spawnedPid ) &&
+			std::find( excludeExistingPids.begin(), excludeExistingPids.end(),
+				spawnedPid ) == excludeExistingPids.end() )
+		{
+			return spawnedPid;
+		}
+
+		// (b) Fallback: FindDotaPids ∖ exclude. Под mutex'ом эта ветка обычно
+		// сразу возвращает нашу dota (Steam single-instance не релевантен
+		// в recovery scenario потому что мы убили старую dota перед spawn'ом).
 		auto all = FindDotaPids();
 		for ( DWORD pid : all )
 		{
 			if ( std::find( excludeExistingPids.begin(), excludeExistingPids.end(), pid )
 				!= excludeExistingPids.end() )
 				continue;
-			if ( spawnedPid != 0 && pid == spawnedPid )
-				return pid;
-			// Любой "не из excluded" — наш кандидат.
 			return pid;
 		}
 		Sleep( 1000 );

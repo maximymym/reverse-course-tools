@@ -344,4 +344,15 @@ private:
 	int               m_nextSequentialIdx = 0;
 
 	mutable std::mutex m_mutex;
+
+	// CR-FIX 2026-05-26: serialize RecoveryThread'ы. Без него 2 параллельных
+	// recovery race'ятся в LaunchDotaOnly — оба видят одну новую dota2.exe
+	// (FindDotaPids ∖ excludeSet) и оба возвращают её как "свою". Симптом в
+	// DotaFarm.log: "#1: recovery: dota2.exe PID X spawned" + "#3: recovery:
+	// dota2.exe PID X spawned" — одинаковый PID, второй inevitably exit'ит
+	// → watchdog → DEAD. Также concurrent shader recompile на WARP usurp'ит
+	// все GPU слоты разом, → terminal crash recurrence. Serialization OK для
+	// фермы: 5 одновременных crashes — recover 1 за раз с ~120s каждый,
+	// итого ~10 мин полной восстановки. Лучше чем фейк-DEAD за 5 мин.
+	std::mutex        m_recoveryMx;
 };

@@ -1612,6 +1612,13 @@ void Orchestrator::MonitorTick()
 void Orchestrator::RecoveryThread( int idx )
 {
 	if ( idx < 0 || idx >= m_nBotCount ) return;
+
+	// CR-FIX 2026-05-26: global serialization. До этого LaunchDotaOnly мог
+	// вернуть один и тот же PID двум параллельным recovery thread'ам (см.
+	// orchestrator.h m_recoveryMx). Также избегаем concurrent shader recompile
+	// на WARP (5 parallel = всё лагает 1FPS, recovery ещё хуже).
+	std::lock_guard<std::mutex> recoveryLock( m_recoveryMx );
+
 	auto& bot = m_bots[idx];
 
 	DWORD oldSteamPid = bot.steamPid;
@@ -1620,16 +1627,23 @@ void Orchestrator::RecoveryThread( int idx )
 	// Решаем нужен ли full restart Steam'а. Если steam.exe жив И до этого был
 	// gcReady — это чисто dota-side crash, экономим 70-90s downtime пропуская
 	// kill+relaunch Steam (см. crash_watchdog.h CrashRecoveryConfig::steamRelaunchEnabled).
+	//
+	// CR-FIX 2026-05-26: ALSO force Steam restart на 2-м+ crash подряд того же
+	// бота. Симптом из field-debug 2026-05-24: dota crashed в terminal stage
+	// (WARP GPU 1FPS) → recovery пропустил Steam restart (steam_alive+gc_ready)
+	// → новая dota fast-fail (Steam session state отравлен после crash) →
+	// watchdog → DEAD. Steam restart на retry #2 чистит session/IPC state.
 	const bool steamAlive = oldSteamPid &&
 		DotaLauncher::IsProcessAlive( oldSteamPid );
 	const bool gcWasReady = bot.conn.gcReady;
+	const int  crashCount = m_watchdog.GetCrashCount( idx );
 	const bool needSteamRestart =
 		m_config.crashRecovery.steamRelaunchEnabled &&
-		( !steamAlive || !gcWasReady );
+		( !steamAlive || !gcWasReady || crashCount >= 2 );
 
-	Log( "#%d: recovery: %s — kill dota=%lu steam=%lu (steam_alive=%d gc_ready=%d)",
+	Log( "#%d: recovery: %s — kill dota=%lu steam=%lu (steam_alive=%d gc_ready=%d crashes=%d)",
 		idx, needSteamRestart ? "full restart" : "dota-only restart",
-		oldDotaPid, oldSteamPid, (int)steamAlive, (int)gcWasReady );
+		oldDotaPid, oldSteamPid, (int)steamAlive, (int)gcWasReady, crashCount );
 
 	// B3: cleanup stale per-pid state files в C:\temp\andromeda\ — защита от
 	// PID reuse и от того что match_pending-scanner подхватит старую status.
