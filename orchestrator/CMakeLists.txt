@@ -247,6 +247,21 @@ target_link_libraries(DotaMinifierTest PRIVATE
     shell32.lib
 )
 
+# ── Test target: pair_code codec unit tests (standalone, no gtest) ──
+add_executable(pair_code_test
+    src/pair_code_test.cpp
+    src/pair_code.cpp
+)
+target_include_directories(pair_code_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/deps
+)
+target_compile_definitions(pair_code_test PRIVATE
+    _CRT_SECURE_NO_WARNINGS
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+)
+
 # ── Post-build: copy assets/ (vendored fonts + hero portraits) next to EXE ──
 # Fonts MUST resolve from assets\fonts at runtime — we refuse to fall back
 # to system fonts (Inter / Segoe / Consolas) because they're the AI-slop tell.
