@@ -53,6 +53,11 @@ DotaFarm.log
 *.crt
 credentials*
 license.dat
+# dota_relay users database (auth tokens — multi-tenant)
+relay/users.json
+# Two-stand pairing secrets workbook
+.secrets_two_stand.txt
+.secrets_*.txt
 
 # --- Python ---
 __pycache__/
