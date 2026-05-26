@@ -375,6 +375,15 @@ static DWORD s_setupLastPoll = 0;
 static char  s_setupStatus[256] = {}; // user-visible status line
 static std::atomic<bool> s_setupRequestLaunch{ false };  // signal to (re)launch Steam for current step
 
+// Pair Code modal triggers (T10 renders the actual dialogs). Set by T9 panel
+// buttons, consumed and cleared by T10 modal render block.
+static bool s_showGeneratePairCodeDialog = false;
+static bool s_showPastePairCodeDialog    = false;
+
+// Track moment when pairing transport first reported connected=true so the
+// panel can show uptime. Reset to 0 on disconnect transition.
+static int64_t s_pairingConnectedSinceMs = 0;
+
 // Login list (just usernames — steam_id resolved after Steam login)
 static constexpr int MAX_LOGINS = 10;
 static char  s_logins[MAX_LOGINS][64] = {};
@@ -3386,53 +3395,249 @@ static void RenderDashboard( Orchestrator& orch )
 		}
 	}
 
-	// ── Pairing 5v5 self-play (если enabled) ──
+	// ── Pairing 5v5 self-play (если enabled OR uxV2-on) ──
+	// Snapshot taken ровно один раз за кадр — все badges/lines читают из ps,
+	// чтобы не было torn read'ов и Pairing FSM не дёргался сильнее необходимого.
 	{
 		auto ps = orch.GetPairingStatus();
-		if ( ps.enabled )
+		const auto& cfg = orch.GetConfig();
+		const bool uxV2 = cfg.pairing.uxV2;
+
+		// uxV2=true но pairing.enabled=false тоже рисуем panel — там показываем
+		// "NOT CONFIGURED" badge и кнопки настройки. Это часть нового UX'а.
+		const bool showPanel = ps.enabled || uxV2;
+		if ( showPanel )
 		{
 			ImGui::Spacing();
 			theme::SectionBar( "PAIRING  5v5  SELF-PLAY" );
 
-			// Status badge: [MASTER|SLAVE] connected/disconnected, last hb age.
-			ImU32 connCol = ps.connected ? theme::kColSignal : theme::kColCrash;
+			// ── Uptime tracking ─────────────────────────────────────────
+			// Простой edge-detector false→true в connected: на rising edge
+			// запоминаем timestamp. На falling edge сбрасываем.
+			const auto nowTp = std::chrono::steady_clock::now();
+			const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+				nowTp.time_since_epoch() ).count();
+			if ( ps.connected )
+			{
+				if ( s_pairingConnectedSinceMs == 0 )
+					s_pairingConnectedSinceMs = nowMs;
+			}
+			else
+			{
+				s_pairingConnectedSinceMs = 0;
+			}
+
+			// ── Compute effective state badge ───────────────────────────
+			// Priority: sync-start != IDLE → relay auth → relay other →
+			// connection lifecycle. Pick the most user-actionable one.
+			const char* stateLabel = "UNKNOWN";
+			ImU32       stateColor = theme::kColIdle;
+			const bool  isAuthErr  = ( ps.relayErrorCode == "auth_failed"
+				|| ps.relayErrorCode == "unknown_user"
+				|| ps.relayErrorCode == "user_disabled" );
+
+			// SyncStart overrides everything else when active — it's the most
+			// time-critical UI signal (user is about to start a match).
+			switch ( ps.syncStart.state )
+			{
+			case SyncStartState::WAITING_PEER_ACK:
+				stateLabel = "WAITING PEER ACK"; stateColor = theme::kColQueue;  break;
+			case SyncStartState::PEER_REQUESTED:
+				stateLabel = "PEER WANTS TO START"; stateColor = theme::kColGold; break;
+			case SyncStartState::CONFIRMING:
+			case SyncStartState::STARTING:
+				stateLabel = "STARTING...";      stateColor = theme::kColSignal; break;
+			case SyncStartState::DECLINED:
+				stateLabel = "DECLINED";         stateColor = theme::kColWarn;   break;
+			case SyncStartState::TIMEOUT:
+				stateLabel = "TIMEOUT";          stateColor = theme::kColCrash;  break;
+			case SyncStartState::IDLE:
+			default:
+				// Fall through to connection-derived state.
+				if ( uxV2 && !ps.enabled )
+				{
+					stateLabel = "NOT CONFIGURED"; stateColor = theme::kColIdle;
+				}
+				else if ( isAuthErr )
+				{
+					stateLabel = "AUTH FAILED";    stateColor = theme::kColCrash;
+				}
+				else if ( !ps.relayErrorCode.empty() )
+				{
+					stateLabel = "RELAY ERROR";    stateColor = theme::kColWarn;
+				}
+				else if ( !ps.connected )
+				{
+					stateLabel = ps.lastError.empty() ? "CONNECTING" : "DISCONNECTED";
+					stateColor = ps.lastError.empty() ? theme::kColWarn : theme::kColCrash;
+				}
+				else if ( ps.lastPeerHbAgeMs < 0 || ps.clientCount < 1 )
+				{
+					stateLabel = "WAITING PEER";   stateColor = theme::kColWarn;
+				}
+				else if ( ps.lastPeerHbAgeMs > 30000 )
+				{
+					stateLabel = "STALE LINK";     stateColor = theme::kColWarn;
+				}
+				else if ( ps.lastPeerHbAgeMs > 10000 )
+				{
+					stateLabel = "WAITING PEER";   stateColor = theme::kColWarn;
+				}
+				else
+				{
+					stateLabel = "PAIR READY";     stateColor = theme::kColSignal;
+				}
+				break;
+			}
+
+			// ── Top status row: role | state badge | hb | RTT ───────────
 			ImGui::TextColored( theme::V( theme::kColInkDim ), "role:" );
 			ImGui::SameLine();
-			ImGui::TextColored( theme::V( theme::kColGold ), "[%s]", ps.isMaster ? "MASTER" : "SLAVE" );
+			theme::Pill( ps.isMaster ? "MASTER" : "SLAVE", theme::kColGold );
 			ImGui::SameLine();
-			ImGui::TextColored( theme::V( connCol ), "%s", ps.connected ? "CONNECTED" : "DISCONNECTED" );
+			theme::Pill( stateLabel, stateColor );
+
 			ImGui::SameLine();
-			if ( ps.isMaster )
-				ImGui::TextColored( theme::V( theme::kColInkDim ), "clients=%d", ps.clientCount );
 			if ( ps.lastPeerHbAgeMs >= 0 )
 			{
-				ImGui::SameLine();
 				ImGui::TextColored( theme::V( theme::kColInkDim ),
-					"hb age:%lld ms", (long long)ps.lastPeerHbAgeMs );
+					"hb:%lldms", (long long)ps.lastPeerHbAgeMs );
 			}
-			if ( !ps.lastError.empty() )
+			else
 			{
+				ImGui::TextColored( theme::V( theme::kColInkDim ), "hb:-" );
+			}
+			ImGui::SameLine();
+			if ( ps.rttMs >= 0 )
+			{
+				ImGui::TextColored( theme::V( theme::kColInkDim ),
+					"RTT:%lldms", (long long)ps.rttMs );
+			}
+			else
+			{
+				ImGui::TextColored( theme::V( theme::kColInkDim ), "RTT:-" );
+			}
+
+			// ── uxV2-only block: full live telemetry ─────────────────────
+			// Legacy UI (uxV2=false) показывает только base status + strategy
+			// чтобы не сломать существующий пользовательский опыт.
+			if ( uxV2 )
+			{
+				// peer line — userId/pairId + client count.
+				const std::string& uid = cfg.pairing.userId;
+				const std::string& pid = cfg.pairing.pairId;
+				ImGui::TextColored( theme::V( theme::kColInkDim ),
+					"peer: %s/%s   clients: %d/1",
+					uid.empty() ? "-" : uid.c_str(),
+					pid.empty() ? "-" : pid.c_str(),
+					ps.clientCount );
+
+				// messages + uptime
+				char uptimeBuf[16];
+				if ( s_pairingConnectedSinceMs != 0 )
+				{
+					int64_t dt = ( nowMs - s_pairingConnectedSinceMs ) / 1000;
+					if ( dt < 0 ) dt = 0;
+					int hh = (int)( dt / 3600 );
+					int mm = (int)( ( dt / 60 ) % 60 );
+					int ss = (int)( dt % 60 );
+					snprintf( uptimeBuf, sizeof( uptimeBuf ),
+						"%02d:%02d:%02d", hh, mm, ss );
+				}
+				else
+				{
+					snprintf( uptimeBuf, sizeof( uptimeBuf ), "--:--:--" );
+				}
+				ImGui::TextColored( theme::V( theme::kColInkDim ),
+					"messages: %s%llu %s%llu   uptime: %s",
+					u8"↑",
+					(unsigned long long)ps.msgSent,
+					u8"↓",
+					(unsigned long long)ps.msgRecv,
+					uptimeBuf );
+
+				// Громкая auth-error строка ниже (если applicable).
+				if ( ps.usingRelay && !ps.relayErrorCode.empty() )
+				{
+					ImU32 badgeCol = isAuthErr ? theme::kColCrash : theme::kColWarn;
+					ImGui::TextColored( theme::V( badgeCol ),
+						isAuthErr
+							? "[RELAY] AUTH FAILED — check user_id/auth_token in farm.json (code=%s)"
+							: "[RELAY] %s",
+						ps.relayErrorCode.c_str() );
+				}
+				else if ( !ps.lastError.empty() )
+				{
+					ImGui::TextColored( theme::V( theme::kColWarn ),
+						"(%s)", ps.lastError.c_str() );
+				}
+
+				// ── Action buttons row ──────────────────────────────────
+				// Modal dialogs (Generate / Paste) рендерятся в T10 — здесь
+				// только триггерим флаги. Reconnect / Disconnect — runtime
+				// control orchestrator'а напрямую.
+				ImGui::Spacing();
+				const ImVec2 kBtn( 168.f, 24.f );
+				const ImVec2 kBtnSm( 130.f, 24.f );
+				if ( theme::ChamferedButton( "GENERATE PAIR CODE", kBtn,
+					theme::kColBg2, theme::kColGoldDeep, theme::kColGold ) )
+				{
+					s_showGeneratePairCodeDialog = true;
+				}
 				ImGui::SameLine();
-				ImGui::TextColored( theme::V( theme::kColWarn ), " (%s)", ps.lastError.c_str() );
+				if ( theme::ChamferedButton( "PASTE PAIR CODE", kBtn,
+					theme::kColBg2, theme::kColGoldDeep, theme::kColGold ) )
+				{
+					s_showPastePairCodeDialog = true;
+				}
+				ImGui::SameLine();
+				const bool canReconnect = ps.enabled;
+				if ( theme::ChamferedButton( "RECONNECT", kBtnSm,
+					theme::kColBg2, theme::kColLineHot,
+					canReconnect ? theme::kColInk : theme::kColInkMute,
+					false /* primary */ ) )
+				{
+					if ( canReconnect )
+					{
+						orch.RequestForceReconnect();
+						orch.LogPublic( "Pairing: force reconnect requested" );
+					}
+				}
+				ImGui::SameLine();
+				const bool canDisconnect = ps.enabled && ps.connected;
+				if ( theme::ChamferedButton( "DISCONNECT", kBtnSm,
+					theme::kColBg2, theme::kColLineHot,
+					canDisconnect ? theme::kColInk : theme::kColInkMute,
+					false /* primary */ ) )
+				{
+					if ( canDisconnect )
+					{
+						orch.RequestDisconnect();
+						orch.LogPublic( "Pairing: disconnect requested" );
+					}
+				}
 			}
-
-			// Multi-tenant relay credentials check — auth-related ошибки от
-			// relay-сервиса требуют ручного вмешательства (изменить farm.json),
-			// рисуем громкий badge ниже основной строки.
-			if ( ps.usingRelay && !ps.relayErrorCode.empty() )
+			else
 			{
-				bool isAuth = ( ps.relayErrorCode == "auth_failed"
-					|| ps.relayErrorCode == "unknown_user"
-					|| ps.relayErrorCode == "user_disabled" );
-				ImU32 badgeCol = isAuth ? theme::kColCrash : theme::kColWarn;
-				ImGui::TextColored( theme::V( badgeCol ),
-					isAuth
-						? "[RELAY] AUTH FAILED — check user_id/auth_token in farm.json (code=%s)"
-						: "[RELAY] %s",
-					ps.relayErrorCode.c_str() );
+				// Legacy single-line warning if relay error без uxV2.
+				if ( ps.usingRelay && !ps.relayErrorCode.empty() )
+				{
+					ImU32 badgeCol = isAuthErr ? theme::kColCrash : theme::kColWarn;
+					ImGui::TextColored( theme::V( badgeCol ),
+						isAuthErr
+							? "[RELAY] AUTH FAILED — check user_id/auth_token in farm.json (code=%s)"
+							: "[RELAY] %s",
+						ps.relayErrorCode.c_str() );
+				}
+				else if ( !ps.lastError.empty() )
+				{
+					ImGui::TextColored( theme::V( theme::kColWarn ),
+						"(%s)", ps.lastError.c_str() );
+				}
 			}
 
-			// FSM phase + lobby agreement state.
+			// ── Phase / FSM (показываем всегда — даже в legacy UI) ──────
+			ImGui::Spacing();
 			const char* phaseStr = "?";
 			switch ( ps.phase )
 			{
@@ -3456,7 +3661,35 @@ static void RenderDashboard( Orchestrator& orch )
 					"lobby=0x%llx", (unsigned long long)ps.localMajorityLobby );
 			}
 
-			// Strategy badges.
+			// sync-start state name (uxV2 only — иначе users не понимают что это).
+			if ( uxV2 )
+			{
+				const char* ssStr = "IDLE";
+				ImU32       ssCol = theme::kColInkDim;
+				switch ( ps.syncStart.state )
+				{
+				case SyncStartState::IDLE:             ssStr = "IDLE";       ssCol = theme::kColInkDim; break;
+				case SyncStartState::WAITING_PEER_ACK: ssStr = "WAIT_ACK";   ssCol = theme::kColQueue;  break;
+				case SyncStartState::PEER_REQUESTED:   ssStr = "PEER_REQ";   ssCol = theme::kColGold;   break;
+				case SyncStartState::CONFIRMING:       ssStr = "CONFIRMING"; ssCol = theme::kColSignal; break;
+				case SyncStartState::STARTING:         ssStr = "STARTING";   ssCol = theme::kColSignal; break;
+				case SyncStartState::DECLINED:         ssStr = "DECLINED";   ssCol = theme::kColWarn;   break;
+				case SyncStartState::TIMEOUT:          ssStr = "TIMEOUT";    ssCol = theme::kColCrash;  break;
+				}
+				ImGui::Text( "sync-start: " );
+				ImGui::SameLine();
+				ImGui::TextColored( theme::V( ssCol ), "%s", ssStr );
+				if ( !ps.syncStart.lastDeclineReason.empty()
+					&& ( ps.syncStart.state == SyncStartState::DECLINED
+						|| ps.syncStart.state == SyncStartState::TIMEOUT ) )
+				{
+					ImGui::SameLine();
+					ImGui::TextColored( theme::V( theme::kColInkDim ),
+						"(%s)", ps.syncStart.lastDeclineReason.c_str() );
+				}
+			}
+
+			// ── Strategy + next + last 5 (legacy + uxV2 — оставлены as-is) ─
 			ImGui::Text( "strategy:" );
 			ImGui::SameLine();
 			ImU32 sCol = ps.currentStrategy == "WIN"  ? theme::kColSignal :
@@ -3472,7 +3705,6 @@ static void RenderDashboard( Orchestrator& orch )
 			                                         theme::kColInkDim;
 			ImGui::TextColored( theme::V( nCol ), "[%s]", ps.nextStrategy.c_str() );
 
-			// History: W·L·W·L·W
 			ImGui::Text( "last 5:" );
 			ImGui::SameLine();
 			if ( ps.history.empty() )
