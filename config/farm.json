@@ -70,7 +70,8 @@
         "relay_port": 5050,
         "match_sync_timeout_s": 15,
         "max_consecutive_cancels": 3,
-        "post_game_winner_grace_s": 60
+        "post_game_winner_grace_s": 60,
+        "uxV2": true
     },
 
     "team_strategy_mode": "auto",
