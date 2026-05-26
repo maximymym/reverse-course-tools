@@ -49,6 +49,26 @@
 class RelayPeer
 {
 public:
+	enum class State
+	{
+		Disconnected,
+		Connecting,
+		Connected,
+		AuthFailed   // sticky после auth_failed/unknown_user/user_disabled
+	};
+
+	struct Snapshot
+	{
+		State       state;
+		bool        connected;
+		int64_t     lastActivityMs;
+		int64_t     lastRttMs;       // -1 если ещё не было pong
+		uint64_t    msgSent;
+		uint64_t    msgRecv;
+		std::string lastError;
+		std::string lastRelayErrorCode;
+	};
+
 	RelayPeer();
 	~RelayPeer();
 
@@ -57,11 +77,13 @@ public:
 	// pairId — имя пары в namespace user_id.
 	// role — "master" | "slave".
 	// secret — общий HMAC ключ для master ↔ slave (relay его не видит).
+	// onState — optional callback на изменения State (GUI), может быть nullptr.
 	bool Start( const std::string& host, uint16_t port,
 		const std::string& userId, const std::string& userAuthToken,
 		const std::string& pairId, const std::string& role,
 		const std::string& secret,
-		std::function<void( const PeerMsg& )> onMsg );
+		std::function<void( const PeerMsg& )> onMsg,
+		std::function<void( State )> onState = nullptr );
 	void Stop();
 
 	// Подписать и отправить msg. Best-effort: если socket closed — silent no-op
@@ -80,9 +102,17 @@ public:
 	// ошибка не auth-related). Используется GUI'ем для индикации auth_failed.
 	std::string LastRelayErrorCode() const;
 
+	// Принудительный reconnect: bypass backoff (одноразово). Закрывает текущий
+	// сокет (recv loop увидит ошибку → ре-коннект без backoff'а).
+	void RequestReconnect();
+
+	// Атомарный snapshot всех telemetry-полей. GUI вызывает 5-10Hz.
+	Snapshot GetSnapshot() const;
+
 private:
 	void RunLoop();
 	bool SendHello( SOCKET s );
+	void SetState( State s );
 
 	std::string                     m_host;
 	uint16_t                        m_port = 0;
@@ -92,10 +122,24 @@ private:
 	std::string                     m_role;
 	std::string                     m_secret;
 	std::function<void( const PeerMsg& )> m_onMsg;
+	std::function<void( State )>          m_onState;
 
 	std::atomic<bool>               m_running{ false };
 	std::atomic<bool>               m_connected{ false };
 	std::atomic<int64_t>            m_lastActivityMs{ 0 };
+
+	// Telemetry counters (incremented в Send / recv loop).
+	std::atomic<uint64_t>           m_msgSent{ 0 };
+	std::atomic<uint64_t>           m_msgRecv{ 0 };
+
+	// RTT: m_lastRttMs = -1 пока нет pong'а. m_lastPingSentMs — timestamp
+	// последнего нашего ping'а (для idle-cadence в RunLoop).
+	std::atomic<int64_t>            m_lastRttMs{ -1 };
+	std::atomic<int64_t>            m_lastPingSentMs{ 0 };
+
+	// State + force-reconnect flag.
+	std::atomic<State>              m_state{ State::Disconnected };
+	std::atomic<bool>               m_forceReconnect{ false };
 
 	std::thread                     m_thread;
 
