@@ -56,4 +56,9 @@ std::string Encode(
 
 DecodeResult Decode( const std::string& code );
 
+// Generate base64url-encoded 32 random bytes — ready-to-use pair_secret для
+// hello-handshake. Cryptographic randomness через BCryptGenRandom, fallback на
+// std::random_device при сбое CNG.
+std::string GenerateRandomSecret();
+
 }  // namespace pair_code

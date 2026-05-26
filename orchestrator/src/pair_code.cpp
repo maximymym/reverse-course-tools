@@ -6,9 +6,17 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <bcrypt.h>
+#pragma comment(lib, "bcrypt.lib")
 
 namespace pair_code
 {
@@ -399,6 +407,22 @@ DecodeResult Decode( const std::string& codeIn )
 		r.error = Error::BadField;
 		return r;
 	}
+}
+
+std::string GenerateRandomSecret()
+{
+	uint8_t raw[32];
+	NTSTATUS st = BCryptGenRandom(
+		nullptr, raw, sizeof( raw ), BCRYPT_USE_SYSTEM_PREFERRED_RNG );
+	if ( !BCRYPT_SUCCESS( st ) )
+	{
+		// Fallback на std::random_device — не crypto-grade, но не nullptr.
+		std::random_device rd;
+		for ( size_t i = 0; i < sizeof( raw ); ++i )
+			raw[i] = static_cast< uint8_t >( rd() & 0xFFu );
+	}
+	std::vector< uint8_t > v( raw, raw + sizeof( raw ) );
+	return Base64UrlEncode( v );
 }
 
 }  // namespace pair_code

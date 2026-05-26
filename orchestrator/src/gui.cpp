@@ -379,6 +379,8 @@ static std::atomic<bool> s_setupRequestLaunch{ false };  // signal to (re)launch
 // buttons, consumed and cleared by T10 modal render block.
 static bool s_showGeneratePairCodeDialog = false;
 static bool s_showPastePairCodeDialog    = false;
+// Admin onboarding modal (T15) — first-time relay creds setup без farm.json edit.
+static bool s_showAdminSetupDialog       = false;
 
 // Track moment when pairing transport first reported connected=true so the
 // panel can show uptime. Reset to 0 on disconnect transition.
@@ -1893,6 +1895,172 @@ static void RenderPairCodePasteModal_( Orchestrator& orch )
 			s_lastError.clear();
 			s_decodedOk = false;
 			s_lastDecodedInput.clear();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
+static void RenderAdminSetupModal_( Orchestrator& orch )
+{
+	static bool wasOpened = false;
+	static char s_relayHost[128]      = "144.31.85.217";
+	static int  s_relayPort           = 5050;
+	static char s_userId[64]          = {};
+	static char s_userAuthToken[128]  = {};
+	static char s_pairId[64]          = {};
+	static char s_pairSecret[128]     = {};
+	static int  s_roleIdx             = 0;  // 0=master, 1=slave
+	static std::string s_lastError;
+
+	if ( !s_showAdminSetupDialog )
+	{
+		if ( wasOpened )
+		{
+			wasOpened = false;
+			s_lastError.clear();
+		}
+		return;
+	}
+
+	if ( !wasOpened )
+	{
+		// Pre-fill из текущей config (если что-то уже есть).
+		const auto& cur = orch.GetConfig().pairing;
+		strncpy_s( s_relayHost,
+			cur.relayHost.empty() ? "144.31.85.217" : cur.relayHost.c_str(),
+			_TRUNCATE );
+		s_relayPort = cur.relayPort > 0 ? (int)cur.relayPort : 5050;
+		strncpy_s( s_userId, cur.userId.c_str(), _TRUNCATE );
+		strncpy_s( s_userAuthToken, cur.userAuthToken.c_str(), _TRUNCATE );
+		// pairId default "default-pair" — не предзаполняем плейсхолдером.
+		const bool placeholderPair =
+			cur.pairId.empty() || cur.pairId == "default-pair";
+		strncpy_s( s_pairId, placeholderPair ? "" : cur.pairId.c_str(),
+			_TRUNCATE );
+		const bool placeholderSecret =
+			cur.pairSecret.empty() || cur.pairSecret == "change-me-32chars-min";
+		strncpy_s( s_pairSecret,
+			placeholderSecret ? "" : cur.pairSecret.c_str(), _TRUNCATE );
+		s_roleIdx = ( cur.role == "slave" ) ? 1 : 0;
+		ImGui::OpenPopup( "Setup Relay Credentials" );
+		wasOpened = true;
+		s_lastError.clear();
+	}
+
+	ImGui::SetNextWindowSize( ImVec2( 620, 470 ), ImGuiCond_Always );
+	if ( ImGui::BeginPopupModal( "Setup Relay Credentials", nullptr,
+			ImGuiWindowFlags_NoResize ) )
+	{
+		ImGui::TextWrapped( "Первоначальная настройка relay-pair credentials. "
+			"Эти значения вы один раз получаете от admin'а relay или генерируете "
+			"сами (для master). Slave-сторона обычно использует PASTE PAIR CODE "
+			"вместо этого диалога." );
+		ImGui::Spacing();
+
+		ImGui::Text( "Relay host:" );
+		ImGui::PushItemWidth( 260 );
+		ImGui::InputText( "##relay_host", s_relayHost, sizeof( s_relayHost ) );
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		ImGui::Text( "Port:" );
+		ImGui::SameLine();
+		ImGui::PushItemWidth( 90 );
+		ImGui::InputInt( "##relay_port", &s_relayPort, 0, 0 );
+		ImGui::PopItemWidth();
+
+		ImGui::Spacing();
+		ImGui::Text( "User ID (выдаётся admin'ом relay):" );
+		ImGui::PushItemWidth( -1 );
+		ImGui::InputText( "##user_id", s_userId, sizeof( s_userId ) );
+
+		ImGui::Spacing();
+		ImGui::Text( "User Auth Token (32+ chars):" );
+		ImGui::InputText( "##user_token", s_userAuthToken,
+			sizeof( s_userAuthToken ), ImGuiInputTextFlags_Password );
+
+		ImGui::Spacing();
+		ImGui::Text( "Pair ID (имя пары в namespace user_id):" );
+		ImGui::InputText( "##pair_id", s_pairId, sizeof( s_pairId ) );
+		ImGui::PopItemWidth();
+
+		ImGui::Spacing();
+		ImGui::Text( "Pair Secret (HMAC ключ между master/slave, 32+ chars):" );
+		ImGui::PushItemWidth( ImGui::GetContentRegionAvail().x - 130.f );
+		ImGui::InputText( "##pair_secret", s_pairSecret,
+			sizeof( s_pairSecret ), ImGuiInputTextFlags_Password );
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		if ( theme::ChamferedButton( "GENERATE", ImVec2( 120, 22 ),
+				theme::kColBg2, theme::kColGold, theme::kColGold ) )
+		{
+			std::string s = pair_code::GenerateRandomSecret();
+			strncpy_s( s_pairSecret, s.c_str(), _TRUNCATE );
+		}
+
+		ImGui::Spacing();
+		ImGui::Text( "Role:" );
+		ImGui::SameLine();
+		ImGui::RadioButton( "master", &s_roleIdx, 0 );
+		ImGui::SameLine();
+		ImGui::RadioButton( "slave",  &s_roleIdx, 1 );
+
+		ImGui::Spacing();
+		if ( !s_lastError.empty() )
+		{
+			ImGui::TextColored( theme::V( theme::kColCrash ),
+				"x %s", s_lastError.c_str() );
+		}
+
+		ImGui::Spacing();
+
+		const bool canSave =
+			s_relayHost[0] != 0 &&
+			s_relayPort > 0 && s_relayPort <= 65535 &&
+			s_userId[0] != 0 &&
+			strlen( s_userAuthToken ) >= 32 &&
+			s_pairId[0] != 0 &&
+			strlen( s_pairSecret ) >= 32;
+
+		const ImU32 saveFill   = canSave ? theme::kColGold    : theme::kColBg2;
+		const ImU32 saveBorder = canSave ? theme::kColGold    : theme::kColLineHot;
+		const ImU32 saveText   = canSave ? theme::kColBg0     : theme::kColInkMute;
+		if ( theme::ChamferedButton( "SAVE & CONNECT", ImVec2( 180, 32 ),
+				saveFill, saveBorder, saveText, canSave ) )
+		{
+			if ( canSave )
+			{
+				const char* roleStr = ( s_roleIdx == 0 ) ? "master" : "slave";
+				if ( orch.ApplyAdminConfigAndReinit(
+						s_relayHost, (uint16_t)s_relayPort,
+						s_userId, s_userAuthToken,
+						s_pairId, s_pairSecret, roleStr ) )
+				{
+					orch.LogPublic( "[pairing] admin config applied via GUI" );
+					s_showAdminSetupDialog = false;
+					wasOpened = false;
+					s_lastError.clear();
+					ImGui::CloseCurrentPopup();
+				}
+				else
+				{
+					s_lastError = "Apply failed — see orchestrator log";
+				}
+			}
+		}
+		if ( !canSave )
+		{
+			ImGui::SameLine();
+			ImGui::TextColored( theme::V( theme::kColWarn ),
+				"  Auth token + pair_secret >= 32 chars, остальные fields not empty" );
+		}
+		ImGui::SameLine();
+		if ( theme::ChamferedButton( "CANCEL", ImVec2( 120, 32 ),
+				theme::kColIdle, theme::kColIdle, theme::kColBg0, true ) )
+		{
+			s_showAdminSetupDialog = false;
+			wasOpened = false;
+			s_lastError.clear();
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
@@ -3890,6 +4058,29 @@ static void RenderDashboard( Orchestrator& orch )
 				ImGui::Spacing();
 				const ImVec2 kBtn( 168.f, 24.f );
 				const ImVec2 kBtnSm( 130.f, 24.f );
+
+				// T15: SETUP CREDENTIALS — admin onboarding для first-time
+				// setup без farm.json edit. Видна только когда creds incomplete.
+				const bool credsIncomplete =
+					cfg.pairing.relayHost.empty() ||
+					cfg.pairing.userId.empty() ||
+					cfg.pairing.userAuthToken.empty() ||
+					cfg.pairing.pairId.empty() ||
+					cfg.pairing.pairSecret.empty() ||
+					cfg.pairing.pairSecret == "change-me-32chars-min";
+				if ( credsIncomplete )
+				{
+					if ( theme::ChamferedButton( "SETUP CREDENTIALS...", kBtn,
+						theme::kColBg2, theme::kColGold, theme::kColGold ) )
+					{
+						s_showAdminSetupDialog = true;
+					}
+					ImGui::SameLine();
+					ImGui::TextColored( theme::V( theme::kColWarn ),
+						"<- Required: relay credentials не настроены" );
+					ImGui::Spacing();
+				}
+
 				if ( theme::ChamferedButton( "GENERATE PAIR CODE", kBtn,
 					theme::kColBg2, theme::kColGoldDeep, theme::kColGold ) )
 				{
@@ -4199,6 +4390,7 @@ static void RenderDashboard( Orchestrator& orch )
 	// выставляются T9 Pairing Panel buttons + SyncStartCoordinator state.
 	RenderPairCodeGenerateModal_( orch );
 	RenderPairCodePasteModal_( orch );
+	RenderAdminSetupModal_( orch );
 	RenderSyncStartModal_( orch );
 
 	ImGui::End();

@@ -3203,6 +3203,51 @@ bool Orchestrator::ApplyPairCodeAndReinit( const pair_code::Decoded& decoded )
 	return true;
 }
 
+bool Orchestrator::ApplyAdminConfigAndReinit(
+	const std::string& relayHost, uint16_t relayPort,
+	const std::string& userId, const std::string& userAuthToken,
+	const std::string& pairId, const std::string& pairSecret,
+	const std::string& role )
+{
+	// Same transactional pattern как ApplyPairCodeAndReinit: build new config
+	// в copy, persist FIRST, и только после успешной atomic-записи commit'им
+	// в m_config. Save fail = in-memory untouched.
+	FarmConfig::PairingConfig newPairing = m_config.pairing;
+	newPairing.transport     = "relay";
+	newPairing.relayHost     = relayHost;
+	newPairing.relayPort     = relayPort;
+	newPairing.userId        = userId;
+	newPairing.userAuthToken = userAuthToken;
+	newPairing.pairId        = pairId;
+	newPairing.pairSecret    = pairSecret;
+	newPairing.role          = role;
+	newPairing.uxV2          = true;
+	newPairing.enabled       = true;
+
+	std::string path = m_config.configDir + "\\farm.json";
+	if ( !config::SavePairingConfigAtomic( path, newPairing ) )
+	{
+		Log( "[pairing] ApplyAdminConfigAndReinit: SavePairingConfigAtomic FAILED "
+			"(%s) — in-memory pairing untouched",
+			path.c_str() );
+		return false;
+	}
+
+	m_config.pairing = newPairing;
+
+	if ( !ReinitPairing() )
+	{
+		Log( "[pairing] ApplyAdminConfigAndReinit: file saved but ReinitPairing "
+			"FAILED (transport will retry on next ReinitPairing call)" );
+		return false;
+	}
+
+	Log( "[pairing] ApplyAdminConfigAndReinit OK (relay=%s:%u user=%s pair=%s role=%s)",
+		relayHost.c_str(), (unsigned)relayPort, userId.c_str(),
+		pairId.c_str(), role.c_str() );
+	return true;
+}
+
 std::string Orchestrator::GenerateCurrentPairCode() const
 {
 	const auto& p = m_config.pairing;

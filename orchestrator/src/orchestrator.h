@@ -281,6 +281,18 @@ public:
 	// SavePairingConfigAtomic + ReinitPairing в один атомарный для GUI шаг.
 	bool ApplyPairCodeAndReinit( const pair_code::Decoded& decoded );
 
+	// Admin onboarding: apply individual pairing fields (вместо decoded Pair Code).
+	// Transactional как ApplyPairCodeAndReinit — build new config in copy, save
+	// FIRST, потом commit + ReinitPairing. role: "master" | "slave".
+	bool ApplyAdminConfigAndReinit(
+		const std::string& relayHost,
+		uint16_t           relayPort,
+		const std::string& userId,
+		const std::string& userAuthToken,
+		const std::string& pairId,
+		const std::string& pairSecret,
+		const std::string& role );
+
 	// Текущий pair code на основе live config (для Generate dialog).
 	// Master генерит код для slave (roleHint="S"), и наоборот. Возвращает ""
 	// если конфиг не заполнен (отсутствуют relayHost / userId / pairSecret / ...).
