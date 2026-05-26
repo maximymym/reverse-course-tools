@@ -159,6 +159,16 @@ void MatchPairingFsm::OnMatchPendingFile( int botIdx, uint64_t lobbyId )
 
 void MatchPairingFsm::OnPeerMessage( const PeerMsg& m )
 {
+	// Sync-start handshake messages route в SyncStartCoordinator (отдельный FSM).
+	// Match-FSM не должна их видеть — иначе reset cancelStreak / ложные phase
+	// transitions. Callback не под mutex — SyncStartCoordinator имеет свой.
+	if ( m.type == "start_request" || m.type == "start_ack" ||
+	     m.type == "start_cancel"  || m.type == "ping"      || m.type == "pong" )
+	{
+		if ( onSyncStartMsg ) onSyncStartMsg( m );
+		return;
+	}
+
 	std::lock_guard<std::mutex> lk( m_mx );
 
 	if ( m.type == "match_found" )

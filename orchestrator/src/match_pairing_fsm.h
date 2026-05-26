@@ -79,6 +79,12 @@ public:
 	// в виде объекта (без HMAC — обёртка делается ниже на TCP layer).
 	std::function<void(const nlohmann::json&)> onBroadcast;
 
+	// onSyncStartMsg — passthrough callback для msg types, которые относятся
+	// к synchronized START FARM handshake (SyncStartCoordinator). Match-FSM их
+	// не обрабатывает (см. OnPeerMessage). Устанавливается извне (orchestrator
+	// wires в SyncStartCoordinator::OnPeerMessage).
+	std::function<void(const PeerMsg&)> onSyncStartMsg;
+
 	// Snapshot для GUI / лога.
 	struct DebugStatus
 	{
