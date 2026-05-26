@@ -8,6 +8,7 @@
 
 #include <imgui.h>
 #include <math.h>  // powf — used by EaseOutExpo inline
+#include <string>
 
 struct ImDrawList;
 
@@ -186,5 +187,18 @@ enum class WatchdogState { Healthy, Suspect, Dead, Unknown };
 
 float WatchdogPill( ImDrawList* dl, ImVec2 origin, WatchdogState state,
 	const char* extra_label = nullptr );
+
+// ── Generic helpers (Pair Code workflow, T9/T10) ────────────────────────
+// Copy UTF-8 text to system clipboard (CF_UNICODETEXT). Synchronous, < 1ms.
+// Returns true on success, false if clipboard could not be opened or
+// allocation failed. Failures are silent — caller decides whether to surface.
+bool CopyToClipboard( const std::string& text );
+
+// Small rounded badge with text — minimal Pill (NOT the stateful WatchdogPill
+// above). Renders inline at current cursor position via DrawList, reserves
+// layout space via ImGui::Dummy so it composes with SameLine(). Text is
+// drawn in white assuming the dark base palette. 16px nominal height (text
+// height + 2*padY where padY=2).
+void Pill( const char* label, ImU32 color );
 
 } // namespace theme

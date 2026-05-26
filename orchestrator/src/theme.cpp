@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <string>
 #include <unordered_map>
 #include <Windows.h>
 
@@ -668,6 +669,59 @@ float WatchdogPill( ImDrawList* dl, ImVec2 origin, WatchdogState state,
 	}
 
 	return h;
+}
+
+// ── Generic helpers ─────────────────────────────────────────────────────
+
+bool CopyToClipboard( const std::string& text )
+{
+	if ( !OpenClipboard( nullptr ) ) return false;
+	if ( !EmptyClipboard() ) { CloseClipboard(); return false; }
+
+	// UTF-8 → UTF-16 — Windows clipboard CF_UNICODETEXT is wide.
+	int wlen = MultiByteToWideChar( CP_UTF8, 0, text.c_str(), (int)text.size(),
+	                                 nullptr, 0 );
+	HGLOBAL hMem = GlobalAlloc( GMEM_MOVEABLE, ( wlen + 1 ) * sizeof( wchar_t ) );
+	if ( !hMem ) { CloseClipboard(); return false; }
+	auto* buf = (wchar_t*)GlobalLock( hMem );
+	if ( !buf ) { GlobalFree( hMem ); CloseClipboard(); return false; }
+	MultiByteToWideChar( CP_UTF8, 0, text.c_str(), (int)text.size(), buf, wlen );
+	buf[wlen] = 0;
+	GlobalUnlock( hMem );
+
+	HANDLE r = SetClipboardData( CF_UNICODETEXT, hMem );
+	CloseClipboard();
+	if ( !r )
+	{
+		// Ownership returns to us only on failure; on success the system owns hMem.
+		GlobalFree( hMem );
+		return false;
+	}
+	return true;
+}
+
+void Pill( const char* label, ImU32 color )
+{
+	ImVec2 textSize = ImGui::CalcTextSize( label );
+	float  padX     = 6.0f;
+	float  padY     = 2.0f;
+	ImVec2 cursor   = ImGui::GetCursorScreenPos();
+	ImVec2 size( textSize.x + padX * 2.f, textSize.y + padY * 2.f );
+
+	ImDrawList* dl  = ImGui::GetWindowDrawList();
+	float radius    = size.y * 0.5f;
+	dl->AddRectFilled( cursor,
+		ImVec2( cursor.x + size.x, cursor.y + size.y ),
+		color, radius );
+
+	// White text — assumes dark theme base. Caller picks fill color
+	// dark enough that white contrasts.
+	dl->AddText(
+		ImVec2( cursor.x + padX, cursor.y + padY ),
+		IM_COL32( 255, 255, 255, 255 ),
+		label );
+
+	ImGui::Dummy( size );
 }
 
 } // namespace theme
