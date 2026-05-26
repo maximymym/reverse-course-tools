@@ -337,6 +337,15 @@ private:
 	void InitPairing_();
 	void TickPostGameDetection();
 	std::string ResolveStrategyForNextMatch();
+
+	// Two-stand party_ready coordination (Bug C fix). Edge-triggered broadcast
+	// в peer когда наша local 5-местная party собрана и боты в IN_MENU/FORMING_PARTY.
+	// Peer-side OnPairingMessage пишет/удаляет C:\\temp\\andromeda\\peer_ready.flag;
+	// DLL gates на этот flag перед transition FORMING_PARTY -> QUEUING.
+	bool LocalPartyReady() const;
+	void TickLocalPartyReadyBroadcast();
+	void WritePeerReadyFlag( bool ready );
+	void CleanupPeerReadyFlag();
 	void RestartInstance( int idx );
 	void BuildPartyMembers( int excludeIdx, uint64_t* out, int& count );
 	void CreateProfileDirs();
@@ -386,6 +395,15 @@ private:
 	uint64_t                 m_lastHandledMatchId = 0;
 	int                      m_pauseUntilMatchCancelMs = 0;  // если streak ≥ max — long pause
 	uint64_t                 m_pauseUntilMs = 0;
+
+	// Two-stand party_ready broadcast state (Bug C fix). Edge-trigger чтобы не
+	// спамить peer'а каждый MonitorTick. Sticky: только при изменении статуса
+	// шлём peer'у. Throttle 1s для защиты от микро-flap'а.
+	bool                     m_lastBroadcastedLocalPartyReady = false;
+	int64_t                  m_partyReadyLastBroadcastMs = 0;
+	// Peer's last reported party_ready status (тоже sticky на нашей стороне для
+	// корректного DLL signaling).
+	bool                     m_peerPartyReady = false;
 	// Mapping pid → botIdx для match_pending файлов.
 	std::map<DWORD, int>     m_pidToBotIdx;
 

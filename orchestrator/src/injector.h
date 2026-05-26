@@ -31,11 +31,15 @@ public:
 	// reconnectLobbyId: если != 0, DLL стартует в режиме "reconnect": не дёргает
 	// matchmaking init, а сразу вызывает reconnect_to_match(lobby_id) и
 	// auto_queue=false. Используется при recovery после mid-match crash.
+	// requirePeerReady: для two-stand pairing — DLL ждёт C:\\temp\\andromeda\\peer_ready.flag
+	// перед FORMING_PARTY → QUEUING transition. Orchestrator выставляет когда pairing.enabled.
 	static bool WriteInstanceConfig( DWORD pid, int instanceId, const char* role,
 		const std::vector<std::string>& heroes,
 		const uint64_t* partyMembers, int partyCount,
 		uint32_t region, uint32_t gameMode,
-		uint64_t reconnectLobbyId = 0 );
+		uint64_t reconnectLobbyId = 0,
+		bool requirePeerReady = false,
+		float peerReadyTimeoutS = 120.0f );
 
 	// Write per-PID proxy config for ProxyHook.dll. Atomic write to
 	// C:\temp\andromeda\proxy_<pid>.json. proxy string должен быть в формате

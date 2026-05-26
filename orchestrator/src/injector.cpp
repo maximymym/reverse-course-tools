@@ -202,7 +202,9 @@ bool Injector::WriteInstanceConfig( DWORD pid, int instanceId, const char* role,
 	const std::vector<std::string>& heroes,
 	const uint64_t* partyMembers, int partyCount,
 	uint32_t region, uint32_t gameMode,
-	uint64_t reconnectLobbyId )
+	uint64_t reconnectLobbyId,
+	bool requirePeerReady,
+	float peerReadyTimeoutS )
 {
 	CreateDirectoryA( "C:\\temp", nullptr );
 	CreateDirectoryA( "C:\\temp\\andromeda", nullptr );
@@ -241,6 +243,11 @@ bool Injector::WriteInstanceConfig( DWORD pid, int instanceId, const char* role,
 	for ( int i = 0; i < partyCount; i++ )
 		members.push_back( partyMembers[i] );
 	j["party_members"] = members;
+
+	// Two-stand pairing gate (Bug C fix). DLL читает оба поля в InstanceConfig.hpp
+	// и применяет gate в CBotStateMachine::OnTick_FormingParty перед QUEUING.
+	j["require_peer_ready"]  = requirePeerReady;
+	j["peer_ready_timeout_s"] = peerReadyTimeoutS;
 
 	// Atomic write
 	char tmpPath[MAX_PATH];

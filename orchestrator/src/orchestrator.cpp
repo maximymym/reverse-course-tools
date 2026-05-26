@@ -1175,13 +1175,18 @@ void Orchestrator::StartFarmThread()
 				heroPool.push_back( m_config.heroes[h] );
 		}
 
+		// reconnectLobbyId=0 здесь (fresh start, не crash recovery).
+		// requirePeerReady=pairing.enabled → DLL ждёт peer_ready.flag перед QUEUING.
 		Injector::WriteInstanceConfig( m_bots[i].dotaPid, i, role,
 			heroPool, partyMembers, partyCount,
-			m_config.region, m_config.gameMode );
+			m_config.region, m_config.gameMode,
+			/*reconnectLobbyId*/ 0,
+			/*requirePeerReady*/ m_config.pairing.enabled,
+			/*peerReadyTimeoutS*/ 120.0f );
 
 		// Dump what we wrote
-		Log( "#%d: config written — role=%s, heroes=%d, party_members=%d",
-			i, role, (int)heroPool.size(), partyCount );
+		Log( "#%d: config written — role=%s, heroes=%d, party_members=%d, peer_gate=%d",
+			i, role, (int)heroPool.size(), partyCount, (int)m_config.pairing.enabled );
 		for ( int p = 0; p < partyCount; p++ )
 			Log( "#%d:   party[%d] = %llu", i, p, (unsigned long long)partyMembers[p] );
 
@@ -1360,6 +1365,9 @@ void Orchestrator::StopFarm()
 		m_postGameHandled = false;
 		m_lastHandledMatchId = 0;
 		m_pauseUntilMs = 0;
+		// Two-stand: убираем stale peer_ready.flag — следующий StartFarm
+		// получит чистое состояние.
+		CleanupPeerReadyFlag();
 	}
 
 	for ( int i = 0; i < m_nBotCount; i++ )
@@ -1445,6 +1453,10 @@ void Orchestrator::MonitorTick()
 			auto decision = m_pairing.Tick( nowMsP );
 			if ( decision.kind != PairingDecision::NONE )
 				HandlePairingDecision( decision );
+
+			// Two-stand party_ready coordination (Bug C fix). Edge-trigger
+			// broadcast peer'у когда наша 5-местная party собрана.
+			TickLocalPartyReadyBroadcast();
 
 			// POST_GAME → record + write next strategy.txt + bump rotation.
 			TickPostGameDetection();
@@ -2004,10 +2016,15 @@ void Orchestrator::RecoveryThread( int idx )
 	if ( reconnectLobbyId == 0 )
 		reconnectLobbyId = m_watchdog.GetLastKnownLobbyId( idx );
 
+	// On crash recovery: requirePeerReady=pairing.enabled (same as initial inject).
+	// Если бот reconnect'ится в существующий matched lobby (reconnectLobbyId != 0),
+	// DLL вообще пропустит FORMING_PARTY → peer gate не дёрнется (reconnect path).
 	Injector::WriteInstanceConfig( newDotaPid, idx, role,
 		heroPool, partyMembers, partyCount,
 		m_config.region, m_config.gameMode,
-		reconnectLobbyId );
+		reconnectLobbyId,
+		/*requirePeerReady*/ m_config.pairing.enabled,
+		/*peerReadyTimeoutS*/ 120.0f );
 
 	// B2: retry Andromeda inject 3x с backoff. WaitForSingleObject(10s) в Injector
 	// может тайм-аутнуть пока процесс busy initial-module-load — повторим.
@@ -2643,6 +2660,10 @@ void Orchestrator::HandlePairingDecision( const PairingDecision& d )
 			} while ( FindNextFileA( h, &fd ) );
 			FindClose( h );
 		}
+
+		// Также сбросить peer_ready.flag — после CANCEL цикл начинается заново,
+		// peer тоже сбросит свой broadcast при следующей FORMING_PARTY попытке.
+		CleanupPeerReadyFlag();
 	}
 
 	m_pairing.OnDecisionApplied( d );
@@ -2663,6 +2684,24 @@ void Orchestrator::HandlePairingDecision( const PairingDecision& d )
 // Все остальные типы (match_found / decision / hb-derived) идут в FSM.
 void Orchestrator::OnPairingMessage( const PeerMsg& m )
 {
+	// Two-stand party_ready coordination (Bug C fix). Peer репортит когда его
+	// 5 ботов собрали party. Мы пишем/удаляем peer_ready.flag — DLL гейтит на
+	// нём переход FORMING_PARTY → QUEUING. Sticky на m_peerPartyReady чтобы
+	// дублирующие broadcast'ы не флапали FS.
+	if ( m.type == "party_ready" )
+	{
+		bool ready = false;
+		try { ready = m.body.value( "ready", false ); } catch ( ... ) {}
+		if ( ready != m_peerPartyReady )
+		{
+			m_peerPartyReady = ready;
+			WritePeerReadyFlag( ready );
+			Log( "[pairing] peer party_ready=%d → %s peer_ready.flag",
+				(int)ready, ready ? "wrote" : "removed" );
+		}
+		return; // FSM этот msg не обрабатывает
+	}
+
 	if ( m.type != "match_result" )
 	{
 		m_pairing.OnPeerMessage( m );
@@ -2797,6 +2836,11 @@ void Orchestrator::TickPostGameDetection()
 
 	m_lastHandledMatchId = matchId;
 	m_postGameHandled    = true;
+
+	// Two-stand: после POST_GAME боты вернутся в IN_MENU + начнут новый
+	// FORMING_PARTY cycle. peer_ready.flag должен сброситься чтобы peer
+	// edge-trigger broadcast пришёл заново (peer тоже в нашем cycle).
+	CleanupPeerReadyFlag();
 }
 
 std::string Orchestrator::ResolveStrategyForNextMatch()
@@ -2808,6 +2852,108 @@ std::string Orchestrator::ResolveStrategyForNextMatch()
 	if ( m_roleRotation.History().empty() )
 		return "WIN";  // cold start
 	return ( m_roleRotation.LastStrategy() == "WIN" ) ? std::string( "LOSE" ) : std::string( "WIN" );
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Two-stand party_ready coordination (Bug C fix).
+//
+// Главный архитектурный gap до этого fix'а: orchestrator ничего не сообщал DLL
+// в pre-search период (FORMING_PARTY → QUEUING). DLL автономно стартовала
+// matchmaking как только своя party собрана + ping_data есть → master стенд
+// уходил в чужой lobby до того как slave даже gc-ready.
+//
+// Теперь:
+//   1. Каждый MonitorTick: проверяем status_*.json всех 5 локальных ботов.
+//      Если ALL_5 в party.size>=5 + state in {IN_MENU, FORMING_PARTY} →
+//      LocalPartyReady() = true.
+//   2. Edge-trigger broadcast `{type:"party_ready", body:{ready:bool, ts}}`
+//      peer'у через relay (только при изменении).
+//   3. На приёмной стороне OnPairingMessage("party_ready") пишет/удаляет
+//      C:\\temp\\andromeda\\peer_ready.flag.
+//   4. DLL polls flag в OnTick_FormingParty (см. Common/PeerReady.hpp) и
+//      blocks transition в QUEUING пока peer не готов.
+//
+// Cleanup peer_ready.flag — на StopFarm + после CANCEL/POST_GAME (новый цикл
+// должен начинаться без stale state).
+// ───────────────────────────────────────────────────────────────────
+
+bool Orchestrator::LocalPartyReady() const
+{
+	// Требуем минимум 5 ботов (одна полная party).
+	if ( m_nBotCount < 5 ) return false;
+
+	int readyCount = 0;
+	for ( int i = 0; i < m_nBotCount; i++ )
+	{
+		auto& b = m_bots[i];
+		if ( !b.dotaPid ) return false;     // не все ещё запустились
+		// Party size 5+ (4 members + 1 leader). DLL включает свой steam_id в counter.
+		if ( b.party.size < 5 ) return false;
+		// Не в матче — должны быть в menu / forming. После начала matchmaking
+		// этот broadcast уже не actual (peer тоже либо в menu, либо в matchmaking,
+		// в обоих случаях peer_ready flag должен быть удалён до начала нового цикла).
+		if ( b.state != "IN_MENU" && b.state != "FORMING_PARTY" )
+			return false;
+		readyCount++;
+	}
+	return readyCount >= 5;
+}
+
+void Orchestrator::WritePeerReadyFlag( bool ready )
+{
+	const char* path = "C:\\temp\\andromeda\\peer_ready.flag";
+	if ( ready )
+	{
+		// Atomic touch через open+close. Содержимое не используется DLL — только
+		// existence check через GetFileAttributesA.
+		HANDLE h = CreateFileA( path, GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+			CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr );
+		if ( h != INVALID_HANDLE_VALUE )
+		{
+			const char marker[] = "1\n";
+			DWORD bw = 0;
+			WriteFile( h, marker, (DWORD)sizeof( marker ) - 1, &bw, nullptr );
+			CloseHandle( h );
+		}
+	}
+	else
+	{
+		DeleteFileA( path );
+	}
+}
+
+void Orchestrator::CleanupPeerReadyFlag()
+{
+	WritePeerReadyFlag( false );
+	m_peerPartyReady = false;
+	// Также сбрасываем own broadcast state — следующий цикл начнётся с broadcast
+	// "ready=false" → "ready=true" edge trigger когда party соберётся заново.
+	m_lastBroadcastedLocalPartyReady = false;
+}
+
+void Orchestrator::TickLocalPartyReadyBroadcast()
+{
+	if ( !m_config.pairing.enabled ) return;
+	// Anti-spam: не чаще 1 broadcast в 1000ms (защищает relay от flap'а).
+	int64_t nowMs = (int64_t)crash_watchdog::NowMs();
+	if ( m_partyReadyLastBroadcastMs != 0
+		&& nowMs - m_partyReadyLastBroadcastMs < 1000 )
+		return;
+
+	bool curr = LocalPartyReady();
+	if ( curr == m_lastBroadcastedLocalPartyReady ) return; // no change
+
+	m_lastBroadcastedLocalPartyReady = curr;
+	m_partyReadyLastBroadcastMs      = nowMs;
+
+	json msg;
+	msg["type"] = "party_ready";
+	msg["body"] = json::object();
+	msg["body"]["ready"] = curr;
+	msg["body"]["ts"]    = nowMs;
+	SendPairingMessage_( msg );
+	Log( "[pairing] local party_ready=%d broadcast to peer (n_bots=%d)",
+		(int)curr, m_nBotCount );
 }
 
 Orchestrator::PairingStatus Orchestrator::GetPairingStatus() const
