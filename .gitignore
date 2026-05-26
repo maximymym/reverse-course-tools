@@ -58,6 +58,10 @@ relay/users.json
 # Two-stand pairing secrets workbook
 .secrets_two_stand.txt
 .secrets_*.txt
+# Session handoff (содержит pair_secret, user_auth_token)
+HANDOFF_*.md
+# Recon scratch + pulled production logs (PII, lobby_ids, steam_ids)
+pairing_deepfix/
 
 # --- Python ---
 __pycache__/
