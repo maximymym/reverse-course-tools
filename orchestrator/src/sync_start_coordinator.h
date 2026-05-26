@@ -64,6 +64,11 @@ struct SyncStartSnapshot
 	int64_t        ackDeadlineMs      = 0;   // when timeout fires (0 если N/A)
 	std::string    peerRole;                 // initiator's role from request
 	std::string    lastDeclineReason;
+	// Two-stand strategy coordination (Bug B fix). myStrategy = что мы будем
+	// играть (заполняется initiator до Initiate, responder получает opposite
+	// от peerStrategy). peerStrategy = что peer заявил в start_request.body.
+	std::string    myStrategy;
+	std::string    peerStrategy;
 };
 
 class SyncStartCoordinator
@@ -87,8 +92,18 @@ public:
 	// ── User actions ─────────────────────────────────────────────────
 
 	// Initiate: user clicked START FARM. Возвращает false если SyncStart != IDLE.
-	// myRole / configHash едут в start_request body для context'а.
-	bool Initiate( const std::string& myRole, const std::string& configHash );
+	// myRole / configHash / myStrategy едут в start_request body для context'а.
+	// myStrategy ("WIN"/"LOSE"/"DEBOOST") — наша стратегия которую initiator
+	// сообщает peer'у; responder использует opposite (Bug B fix).
+	bool Initiate( const std::string& myRole, const std::string& configHash,
+		const std::string& myStrategy = "" );
+
+	// Возвращает effective strategy (что МЫ должны играть) после handshake.
+	// - Initiator: возвращает myStrategy который был передан в Initiate().
+	// - Responder: возвращает opposite от peerStrategy (если был получен).
+	// - IDLE / decoupled: возвращает "" (caller использует fallback).
+	// Thread-safe.
+	std::string GetEffectiveStrategy() const;
 
 	// Initiator's CANCEL button (отменить свой start_request).
 	void UserCancel();
@@ -127,6 +142,9 @@ private:
 	int64_t            m_enteredStateMs     = 0;
 	int64_t            m_ackDeadlineMs      = 0;
 	std::string        m_lastDeclineReason;
+	// Bug B fix: per-session strategy coordination.
+	std::string        m_myStrategy;     // initiator: задаётся в Initiate
+	std::string        m_peerStrategy;   // responder: вытащено из start_request body
 
 	// Pending callbacks выполняются ПОСЛЕ release mutex'а (чтобы избежать
 	// re-entry в OnPeerMessage / UserAccept из broadcast lambda). Broadcasts

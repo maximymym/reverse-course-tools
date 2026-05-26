@@ -1325,17 +1325,23 @@ void Orchestrator::StartFarmThread()
 	// Strategy.json + strategy.txt начальная запись (Lua боты читают с первой
 	// секунды). На single-machine setup два orchestrator'а пишут общий json —
 	// каждый со своими pids; LockFileEx внутри StrategyWriter::Write защищает RMW.
+	//
+	// Bug B fix: если pairing handshake coordinated strategy (initiator → peer),
+	// мы здесь используем strategy которая прошла через sync_start handshake.
+	// Иначе fallback на ResolveStrategyForNextMatch (single-stand или legacy).
 	{
-		m_currentStrategy = ResolveStrategyForNextMatch();
+		std::string effective = m_syncStart.GetEffectiveStrategy();
+		m_currentStrategy = !effective.empty() ? effective : ResolveStrategyForNextMatch();
 		std::vector<DWORD> pids;
 		for ( int i = 0; i < m_nBotCount; i++ )
 			if ( m_bots[i].dotaPid )
 				pids.push_back( m_bots[i].dotaPid );
 		StrategyWriter::Write( pids, m_currentStrategy );
-		Log( "[strategy] initial strategy = %s (mode=%s, pairing=%s, %d pid(s))",
+		Log( "[strategy] initial strategy = %s (mode=%s, pairing=%s, source=%s, %d pid(s))",
 			m_currentStrategy.c_str(),
 			m_config.teamStrategyMode.c_str(),
 			m_config.pairing.enabled ? "enabled" : "disabled",
+			!effective.empty() ? "sync_start" : "fallback",
 			(int)pids.size() );
 	}
 
@@ -3255,11 +3261,19 @@ bool Orchestrator::GuardedStartFarm()
 	// configHash — placeholder. Не security-critical: используется только в
 	// start_request body для optional sanity check на peer side.
 	std::string configHash = "todo-hash";
-	if ( !m_syncStart.Initiate( m_config.pairing.role, configHash ) )
+
+	// Bug B fix: initiator (мы, на нашем стенде юзер нажал START FARM) сообщает
+	// peer'у свою strategy ("WIN"/"LOSE"/"DEBOOST"). Peer возьмёт opposite. Это
+	// обеспечивает что master = WIN, slave = LOSE (или alternating через ротацию)
+	// уже В ПЕРВОМ матче, без необходимости ждать первый POST_GAME.
+	std::string myStrategy = ResolveStrategyForNextMatch();
+	if ( !m_syncStart.Initiate( m_config.pairing.role, configHash, myStrategy ) )
 	{
 		Log( "[pairing] GuardedStartFarm refused: SyncStartCoordinator::Initiate failed" );
 		return false;
 	}
+	Log( "[pairing] GuardedStartFarm initiator strategy = %s (peer получит opposite)",
+		myStrategy.c_str() );
 
 	// Re-verify socket survived TOCTOU window: GetPairingStatus был snapshot
 	// под no-lock, между ним и Initiate() relay мог отвалиться. Если broadcast

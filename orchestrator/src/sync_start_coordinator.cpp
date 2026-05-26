@@ -95,7 +95,8 @@ void SyncStartCoordinator::Flush_( PendingActions& actions )
 	}
 }
 
-bool SyncStartCoordinator::Initiate( const std::string& myRole, const std::string& configHash )
+bool SyncStartCoordinator::Initiate( const std::string& myRole, const std::string& configHash,
+	const std::string& myStrategy )
 {
 	PendingActions actions;
 	{
@@ -104,16 +105,20 @@ bool SyncStartCoordinator::Initiate( const std::string& myRole, const std::strin
 
 		m_myRole      = myRole;
 		m_configHash  = configHash;
+		m_myStrategy  = myStrategy;     // Bug B fix: shipped peer'у
+		m_peerStrategy.clear();         // initiator не знает peer strategy
 		m_requestId   = GenerateRequestId_();
 		m_lastDeclineReason.clear();
 
 		// Build start_request — payload в "body" (ipc_proto::Sign wire contract).
+		// Поле "strategy" — peer прочитает и invert'нёт у себя (responder=opposite).
 		json b;
 		b["type"] = "start_request";
 		b["body"] = {
 			{ "request_id",  m_requestId },
 			{ "role",        myRole },
 			{ "config_hash", configHash },
+			{ "strategy",    myStrategy },
 		};
 		actions.broadcasts.push_back( std::move( b ) );
 
@@ -121,6 +126,22 @@ bool SyncStartCoordinator::Initiate( const std::string& myRole, const std::strin
 	}
 	Flush_( actions );
 	return true;
+}
+
+std::string SyncStartCoordinator::GetEffectiveStrategy() const
+{
+	std::lock_guard<std::mutex> lk( m_mx );
+	// Initiator path — мы передавали myStrategy в Initiate.
+	if ( !m_myStrategy.empty() )
+		return m_myStrategy;
+	// Responder path — peer прислал свою strategy, мы играем opposite.
+	if ( !m_peerStrategy.empty() )
+	{
+		if ( m_peerStrategy == "WIN" )  return "LOSE";
+		if ( m_peerStrategy == "LOSE" ) return "WIN";
+		return m_peerStrategy;  // DEBOOST / unknown → mirror (не наша забота)
+	}
+	return "";  // decoupled — caller uses fallback
 }
 
 void SyncStartCoordinator::UserCancel()
@@ -267,6 +288,9 @@ void SyncStartCoordinator::OnPeerMessage( const std::string& msgType, const json
 				m_requestId  = incomingId;
 				m_peerRole   = incomingRole;
 				m_configHash = body.value( "config_hash", std::string() );
+				// Bug B fix: peer strategy → инвертируем в GetEffectiveStrategy.
+				m_peerStrategy = body.value( "strategy", std::string() );
+				m_myStrategy.clear();  // responder не initiator, своего нет
 				TransitionTo_( SyncStartState::PEER_REQUESTED, NowMs_(), actions );
 			}
 		}
@@ -400,5 +424,7 @@ SyncStartSnapshot SyncStartCoordinator::GetSnapshot() const
 	s.ackDeadlineMs     = m_ackDeadlineMs;
 	s.peerRole          = m_peerRole;
 	s.lastDeclineReason = m_lastDeclineReason;
+	s.myStrategy        = m_myStrategy;
+	s.peerStrategy      = m_peerStrategy;
 	return s;
 }
