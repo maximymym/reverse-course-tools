@@ -224,6 +224,40 @@ bool Orchestrator::Init( const std::string& configDir, const std::string& exeDir
 	// Резолвим к абсолюту здесь.
 	m_config.minifier.wrapperExe    = ResolvePath( m_config.minifier.wrapperExe );
 	m_config.minifier.wrapperScript = ResolvePath( m_config.minifier.wrapperScript );
+
+	// MINIFIER_DISABLED 2026-06-02 — apply pathway force-disabled навсегда.
+	// Минифаер пишет autoexec.cfg в C:\BotDota\<i>\game\dota\cfg\, что создаёт
+	// real-directory dota ДО того как EnsureBotDotaDir успевает поставить
+	// junction на оригинальный dota\. В результате dota\gameinfo.gi
+	// отсутствует → MessageBox "FATAL ERROR: Application unable to load
+	// gameinfo.gi". См. логи хоста 2026-06-01.
+	// Apply-флаги форсятся в false поверх любого farm.json. Полное удаление
+	// модуля придёт следующим коммитом — этот killswitch гарантирует, что
+	// existing deployments перестают ломать игру немедленно.
+	// mem_reclaim остаётся работать (отдельный модуль, не зависит от enabled).
+	if ( m_config.minifier.enabled
+	  || m_config.minifier.applyAutoexec
+	  || m_config.minifier.applyVideoTxt
+	  || m_config.minifier.applyLaunchOptions
+	  || m_config.minifier.applyVpkPatches
+	  || m_config.minifier.applyD3dHook )
+	{
+		Log( "[minifier] DISABLED in code (killswitch 2026-06-02) — ignoring farm.json apply flags: "
+			"enabled=%d autoexec=%d video=%d launch=%d vpk=%d d3d=%d",
+			(int)m_config.minifier.enabled,
+			(int)m_config.minifier.applyAutoexec,
+			(int)m_config.minifier.applyVideoTxt,
+			(int)m_config.minifier.applyLaunchOptions,
+			(int)m_config.minifier.applyVpkPatches,
+			(int)m_config.minifier.applyD3dHook );
+	}
+	m_config.minifier.enabled            = false;
+	m_config.minifier.applyAutoexec      = false;
+	m_config.minifier.applyVideoTxt      = false;
+	m_config.minifier.applyLaunchOptions = false;
+	m_config.minifier.applyVpkPatches    = false;
+	m_config.minifier.applyD3dHook       = false;
+
 	m_minifier.SetConfig( m_config.minifier );
 	m_minifier.SetLogger(
 		[]( void* ctx, const char* msg ) { ( (Orchestrator*)ctx )->Log( "%s", msg ); },
